@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    A console app rather than xUnit so it can also be published with NativeAOT: there protobuf-net's
+    reflection serializer is unavailable, and the generated wire code is checked on its own.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/STS2Mobile.SteamWire/STS2Mobile.SteamWire.csproj" />
+  </ItemGroup>
+</Project>

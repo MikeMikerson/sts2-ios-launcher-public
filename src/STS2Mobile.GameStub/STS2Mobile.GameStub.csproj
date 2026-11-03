@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The names the game-facing projects compile against, with no game file at build time. Never shipped: the game's own
+       sts2.dll answers these references on the phone. -->
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>sts2</AssemblyName>
+    <RootNamespace>MegaCrit.Sts2</RootNamespace>
+    <NoWarn>$(NoWarn);CS0108;CS0114;CS0649;CS1591;IDE0051;IDE0060</NoWarn>
+    <Nullable>disable</Nullable>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="GodotSharp" Version="4.5.1" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+  <!-- NuGet lock files: every package a restore takes, direct or transitive, is pinned by its content hash in a tracked
+       packages*.lock.json next to the project. A restore for a runtime (the iOS publishes) has other dependencies than a
+       plain one, so it keeps its own lock file per runtime, and the Mono publish its own again. A restore that would
+       change a lock file stops instead; RestoreLockedMode=false in the environment allows it, to update them on purpose. -->
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+    <_LockFileKey Condition="'$(RuntimeIdentifier)' != ''">.$(RuntimeIdentifier)</_LockFileKey>
+    <_LockFileKey Condition="'$(UseMonoRuntime)' == 'true'">$(_LockFileKey).mono</_LockFileKey>
+    <NuGetLockFilePath Condition="'$(_LockFileKey)' != ''">packages$(_LockFileKey).lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+</Project>

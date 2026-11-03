@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Compile only: the patched game's own sts2.dll answers this reference at run time. -->
+    <ProjectReference Include="../STS2Mobile.GameStub/STS2Mobile.GameStub.csproj" Private="false" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

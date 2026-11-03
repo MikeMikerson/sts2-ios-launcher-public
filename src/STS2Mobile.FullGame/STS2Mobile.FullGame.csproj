@@ -1,0 +1,74 @@
+<Project Sdk="Godot.NET.Sdk/4.5.1">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework Condition="'$(GodotTargetPlatform)' == 'ios'">net10.0</TargetFramework>
+    <EnableDynamicLoading Condition="'$(GodotTargetPlatform)' != 'ios'">true</EnableDynamicLoading>
+    <!-- The implicit System.IO using makes FileAccess ambiguous with Godot.FileAccess. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Godot's source generators and its iOS publish emit warnings this project cannot fix. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Godot's iOS export always publishes two simulator slices next to the device slice. The
+         simulator app is made from the device app instead (scripts/simulator.sh), so the simulator
+         slices are explicit empty stubs rather than two more full compiles of Godot's own NativeAOT publish. They cannot run the game. -->
+    <SimulatorStub Condition="$(RuntimeIdentifier.StartsWith('iossimulator'))">true</SimulatorStub>
+    <!-- The same for the device slice of that publish (Godot's export uses NativeAOT): the app's framework is the Mono library
+         (tools/mono/build_mono.py), which replaces this stub in the export's Xcode project. -->
+    <SimulatorStub Condition="'$(GodotTargetPlatform)' == 'ios' And '$(UseMonoRuntime)' != 'true'">true</SimulatorStub>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SimulatorStub)' == 'true'">
+    <Compile Remove="**/*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SimulatorStub)' != 'true'">
+    <ProjectReference Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <ProjectReference Include="../STS2Mobile.Steam/STS2Mobile.Steam.csproj" />
+    <ProjectReference Include="../STS2Mobile.Launcher/STS2Mobile.Launcher.csproj" />
+    <!-- AOT compiled with Mono.Cecil: it prepares the game's assembly on the phone, before there is any game to refer to. -->
+    <ProjectReference Include="../STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+    <!-- AOT compiled too: it makes the pack the game mounts, from the pack Steam delivers. -->
+    <ProjectReference Include="../STS2Mobile.GamePack/STS2Mobile.GamePack.csproj" />
+    <!-- Published with the app and interpreted (below). The launcher has no reference to them in its code. -->
+    <ProjectReference Include="../STS2Mobile.GameAdapters/STS2Mobile.GameAdapters.csproj" />
+    <ProjectReference Include="../STS2Mobile.GameHost/STS2Mobile.GameHost.csproj" />
+    <ProjectReference Include="../STS2Mobile.SteamWire/STS2Mobile.SteamWire.csproj" />
+    <!-- The host ships the hash-gated static serializer profile, not NuGet's runtime serializer calls. -->
+    <PackageReference Include="SteamKit2" Version="3.4.0" ExcludeAssets="compile;runtime" />
+    <Reference Include="SteamKit2"><HintPath>staged/$(TargetFramework)/SteamKit2.dll</HintPath></Reference>
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+  <!-- .NET 10's Unix linker target joins NativeLibrary items without quoting. Keep the
+       file items intact for incremental checks, and quote only their command arguments so
+       a checkout (and its local NuGet cache) can live in a directory containing spaces. -->
+  <Target Name="QuoteNativeLibraryArguments" BeforeTargets="LinkNative"
+          Condition="'$(GodotTargetPlatform)' == 'ios'">
+    <ItemGroup>
+      <LinkerArg Remove="@(NativeLibrary)" />
+      <LinkerArg Include="@(NativeLibrary->'&quot;%(Identity)&quot;')" />
+    </ItemGroup>
+  </Target>
+  <!-- The Mono build (tools/mono/build_mono.py) sets these. Godot's own export publish does not reach anything below. -->
+  <!-- Library mode for the host only. A global -p:NativeLib would also reach the net9.0 references. -->
+  <PropertyGroup Condition="'$(MonoNativeLib)' != ''">
+    <NativeLib>$(MonoNativeLib)</NativeLib>
+  </PropertyGroup>
+  <!-- Library mode's default direct P/Invoke list leaves out CoreLib's globalization calls (DllNotFoundException at the first culture lookup). -->
+  <ItemGroup Condition="'$(UseMonoRuntime)' == 'true'">
+    <DirectPInvokes Include="libSystem.Globalization.Native" />
+  </ItemGroup>
+  <!-- Assemblies with code that nothing uses, kept out of the publish so they are neither AOT compiled nor embedded. tools/mono/check_mono_build.py holds the list and checks it. -->
+  <Target Name="RemoveUnusedAssemblies" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(MonoRemovedAssemblies)' != ''">
+    <PropertyGroup>
+      <_RemovedAssemblies>;$(MonoRemovedAssemblies);</_RemovedAssemblies>
+    </PropertyGroup>
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$(_RemovedAssemblies.Contains(';%(Filename);')) And '%(Extension)' == '.dll'" />
+    </ItemGroup>
+  </Target>
+  <Target Name="InterpretGameAssemblies" BeforeTargets="_AppleAotCompile" Condition="'$(UseMonoRuntime)' == 'true'">
+    <ItemGroup>
+      <_AssembliesToBundleInternal>
+        <!-- They use the game, whose assemblies are absent at build time and change with every game build. An AOT module whose dependency is missing or changed is unusable (aot-runtime.c:331, 338). -->
+        <_InternalForceInterpret Condition="'%(Filename)' == 'STS2Mobile.GameHost' Or '%(Filename)' == 'STS2Mobile.GameAdapters'">true</_InternalForceInterpret>
+      </_AssembliesToBundleInternal>
+    </ItemGroup>
+  </Target>
+</Project>

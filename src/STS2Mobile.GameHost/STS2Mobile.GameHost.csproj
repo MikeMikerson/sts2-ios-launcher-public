@@ -1,0 +1,27 @@
+<Project Sdk="Godot.NET.Sdk/4.5.1">
+  <!-- The host code that touches the game's types. It is interpreted and loaded by name only when the game is present, so
+       the launcher starts without the game and works with any game build whose API it matches. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework Condition="'$(GodotTargetPlatform)' == 'ios'">net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <!-- Compile only: the stub must never reach a publish folder or a project that references this one. -->
+    <ProjectReference Include="../STS2Mobile.GameStub/STS2Mobile.GameStub.csproj" Private="false" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- QuickMatch, when ./setup.sh fetched it: compile only, like the stub. The game folder holds the woven copy the host
+       binds to at run time. -->
+  <PropertyGroup>
+    <QuickMatchAssembly>$(MSBuildThisFileDirectory)../../.tools/builtin-mods/QuickMatch.dll</QuickMatchAssembly>
+    <DefineConstants Condition="Exists('$(QuickMatchAssembly)')">$(DefineConstants);QUICKMATCH</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(QuickMatchAssembly)')">
+    <Reference Include="QuickMatch" HintPath="$(QuickMatchAssembly)" Private="false" />
+    <!-- The relay host, chosen when the app is built (QUICKMATCH_RELAY or .local/QuickMatchRelay.cfg); never in a tracked file.
+         Without it QuickMatch keeps to lobby chat. -->
+    <EmbeddedResource WithCulture="false" Include="$(MSBuildThisFileDirectory)../../.tools/builtin-mods/QuickMatchRelay.cfg" LogicalName="QuickMatchRelay.cfg" Condition="Exists('$(MSBuildThisFileDirectory)../../.tools/builtin-mods/QuickMatchRelay.cfg')" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Godot.SourceGenerators": {
+        "type": "Direct",
+        "requested": "[4.5.1, )",
+        "resolved": "4.5.1",
+        "contentHash": "HOHYJQO5A/kzf5CUobeTPOX+JawSvjkDE0v/Fyo4EMYEC2MvCTGUvpJFjqQQmHYLNsiiB7RLVilcnup+jiVfdA=="
+      },
+      "GodotSharp": {
+        "type": "Direct",
+        "requested": "[4.5.1, )",
+        "resolved": "4.5.1",
+        "contentHash": "5CFnEHT+FByv5desNHMipz/209SCrWR9CGWFZjGHnXupl1Rw8U8q4nf65/unqZVL97Rx+3J5hskPMoDGaiZL9g=="
+      },
+      "QRCoder": {
+        "type": "Direct",
+        "requested": "[1.6.0, )",
+        "resolved": "1.6.0",
+        "contentHash": "XmPA81eo+oRxBuyVdswsSkTGTE1d3thfF11Z1PdD7oB56A6HU4G4AAOdySmGRMb/cljwlFTMWUtosGEnwpS6GA=="
+      },
+      "SteamKit2": {
+        "type": "Direct",
+        "requested": "[3.4.0, )",
+        "resolved": "3.4.0",
+        "contentHash": "3UZ5Useeh+5BJ19gazEpeFc3wRasMEUkrdkgzIhwAAK9VXL9sPbQu11bp6E3W7HsPCbm2s262yuyBbYLzA+4AA==",
+        "dependencies": {
+          "System.IO.Hashing": "10.0.1",
+          "ZstdSharp.Port": "0.8.7",
+          "protobuf-net": "3.2.56"
+        }
+      },
+      "Mono.Cecil": {
+        "type": "Transitive",
+        "resolved": "0.11.6",
+        "contentHash": "f33RkDtZO8VlGXCtmQIviOtxgnUdym9xx/b1p9h91CRGOsJFxCFOFK1FDbVt1OCf1aWwYejUFa2MOQyFWTFjbA=="
+      },
+      "protobuf-net": {
+        "type": "Transitive",
+        "resolved": "3.4.29",
+        "contentHash": "vyHI+j0aiUicBJW8BgCgEezfHm/iwNPncUx/pDU18DpeGb70iqoiuCBHhPUUK4hzpQKmNJuMXvWuKe+WNqJd1w==",
+        "dependencies": {
+          "protobuf-net.Core": "3.4.29"
+        }
+      },
+      "protobuf-net.Core": {
+        "type": "Transitive",
+        "resolved": "3.4.29",
+        "contentHash": "UmIKqS9cXTmJNeRcQgYXD7sECQTvHZBh73mUEDwVwzlQpEMU6cHmx/pK7pTJn8uUUzsuMbgizjCnCxISfS0WHw=="
+      },
+      "System.IO.Hashing": {
+        "type": "Transitive",
+        "resolved": "10.0.1",
+        "contentHash": "Dy6ULPb2S0GmNndjKrEIpfibNsc8+FTOoZnqygtFDuyun8vWboQbfMpQtKUXpgTxokR5E4zFHETpNnGfeWY6NA=="
+      },
+      "ZstdSharp.Port": {
+        "type": "Transitive",
+        "resolved": "0.8.7",
+        "contentHash": "+4VpxvzEKaHpfTjsLRMhQHx6brqGBkIA+fjUM3wUW8ZoWpPFAeKrO2Nf4uZDeBjjzNDNxSRvLQH4b3S9Ku4JJQ=="
+      },
+      "sts2mobile.gameadapters": {
+        "type": "Project"
+      },
+      "sts2mobile.gamehost": {
+        "type": "Project",
+        "dependencies": {
+          "Godot.SourceGenerators": "[4.5.1, )",
+          "GodotSharp": "[4.5.1, )",
+          "STS2Mobile.Platform": "[1.0.0, )"
+        }
+      },
+      "sts2mobile.gamepack": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.GamePatcher": "[1.0.0, )"
+        }
+      },
+      "sts2mobile.gamepatcher": {
+        "type": "Project",
+        "dependencies": {
+          "Mono.Cecil": "[0.11.6, )",
+          "STS2Mobile.Platform": "[1.0.0, )"
+        }
+      },
+      "sts2mobile.launcher": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.GamePatcher": "[1.0.0, )",
+          "STS2Mobile.Steam": "[1.0.0, )"
+        }
+      },
+      "sts2mobile.platform": {
+        "type": "Project"
+      },
+      "sts2mobile.steam": {
+        "type": "Project",
+        "dependencies": {
+          "SteamKit2": "[3.4.0, )"
+        }
+      },
+      "sts2mobile.steamwire": {
+        "type": "Project",
+        "dependencies": {
+          "SteamKit2": "[3.4.0, )",
+          "protobuf-net": "[3.4.29, )"
+        }
+      }
+    },
+    "net10.0/ios-arm64": {}
+  }
+}

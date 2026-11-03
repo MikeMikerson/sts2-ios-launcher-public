@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/STS2Mobile.GamePack/STS2Mobile.GamePack.csproj" />
+    <ProjectReference Include="../../src/STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+    <Content Include="warmup-fixture.tscn" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Built by setup. Beside the tests is where .NET looks for it. -->
+    <None Include="../../vendor/texture-encoder/macos/libsts2_texture_encoder.dylib" Link="libsts2_texture_encoder.dylib" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,38 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Texture2D" path="res://images/a.png" id="1_a"]
+
+[sub_resource type="Curve" id="Curve_a"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0]
+
+[sub_resource type="CurveTexture" id="CurveTexture_a"]
+curve = SubResource("Curve_a")
+
+[sub_resource type="ParticleProcessMaterial" id="Mat_plain"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 98, 0)
+
+[sub_resource type="ParticleProcessMaterial" id="Mat_plain_other_numbers"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 0, 0)
+
+[sub_resource type="ParticleProcessMaterial" id="Mat_curve"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_a")
+
+[sub_resource type="ParticleProcessMaterial" id="Mat_box"]
+particle_flag_disable_z = true
+emission_shape = 3
+gravity = Vector3(0, 0, 0)
+
+[sub_resource type="AtlasTexture" id="Atlas_a"]
+atlas = ExtResource("1_a")
+
+[sub_resource type="ParticleProcessMaterial" id="Mat_outside"]
+emission_point_texture = SubResource("Atlas_a")
+
+[node name="Vfx" type="Node2D"]
+
+[node name="A" type="GPUParticles2D" parent="."]
+process_material = SubResource("Mat_plain")

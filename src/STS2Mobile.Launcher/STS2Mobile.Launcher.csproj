@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../STS2Mobile.Steam/STS2Mobile.Steam.csproj" />
+    <ProjectReference Include="../STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = ["tools"]
+
+[tool.ruff.per-file-target-version]
+# `setup.sh --check` runs this file with the system /usr/bin/python3 (3.9) before the bundled Python exists.
+"tools/setup_ios.py" = "py39"
+# setup_ios.py imports it.
+"tools/install_app.py" = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

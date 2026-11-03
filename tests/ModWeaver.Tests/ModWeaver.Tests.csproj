@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The fixtures are separate assemblies; their sources are not part of the tests. -->
+    <Compile Remove="fixtures/**" />
+    <Compile Include="../STS2Mobile.Platform.Tests/TestPack.cs" Link="TestPack.cs" />
+    <Using Include="STS2Mobile.GamePatcher" />
+    <ProjectReference Include="../../src/STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+    <ProjectReference Include="../../src/STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <!-- Built next to the tests as weaver input; only woven copies are ever loaded. -->
+    <ProjectReference Include="fixtures/GoodMod/GoodMod.csproj" />
+  </ItemGroup>
+</Project>

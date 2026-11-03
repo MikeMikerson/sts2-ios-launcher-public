@@ -1,0 +1,102 @@
+{
+  "game": {
+    "version": "0.111.0",
+    "steam_depot": 2868842,
+    "steam_manifest": "5045320271505434676",
+    "peak_disk_bytes": 4950000000,
+    "release_info_sha256": "97c0cef5a032ff6ed0826c161f5b72778753e9645c3f6dfe9503b5c3d03a8530",
+    "pack_sha256": "b3c9f133143f98a1c329c3d2efc7d8a9feb395db46fd3965b899487bf1f4d106",
+    "textures_kept_original": [".godot/imported/orobas.png-7744e6bafdffb9ae994beeceb9e505ae.bptc.ctex"],
+    "assembly_sha256": "9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4",
+    "other_assemblies_sha256": {
+      "Sentry.dll": "4f1619b048d0b0f604265075bc5311f9f2e4a0ecdc09662009b7ee11d50c216c",
+      "Sentry.Godot.dll": "bef522b322662f6dbf280891e23e2001483107f8bb981f1692c264928753112a",
+      "Steamworks.NET.dll": "1dac8e6e05d89dc1445cebc6e02744c64cdf063adf42f6d1bb22da287ee7d665",
+      "SmartFormat.dll": "6220cde1dafffde5c51a4e23db4bb16e8ec620ef52bac51c0ad5f48c4769f168",
+      "SmartFormat.ZString.dll": "723e9ffdb9cec9565d9bbbdb27b4d19a9b0ba4ff006e1ab8b94022ae5c426450"
+    }
+  },
+  "steamkit2": {
+    "version": "3.4.0",
+    "sha256": {
+      "net10.0": "ea304bb652a5bc5c49bf2cbf2ceeea350b558fe8d56c527e4cf6e98a367dea9b",
+      "net8.0": "70bfc2635b0082c63605d7980aad758992a75cc3f14d6b4a0375e339acd9a4a1"
+    }
+  },
+  "dotnet_sdk": "10.0.401",
+  "dotnet_runtime": "9.0.10",
+  "workload_set": "10.0.401",
+  "python": "3.13.9",
+  "xcode": "27.1",
+  "mono": {
+    "runtime_version": "10.0.12",
+    "libmonosgen_sha256": "cc56d87e3ac7986d7058fa54e0ca582300eaca459274861dd080914f58a1660f",
+    "apple_build_targets": {
+      "input_sha256": "e0f9378f58216b474ae639ac8f8383a6e7c0a38a47919c711b11066db4a10828",
+      "output_sha256": "3e0e5b65c31955faa5767bab0680f41ca9bfc275e07f7eacb161b141d5ec5bb5"
+    },
+    "godotsharp": {
+      "version": "4.5.1",
+      "input_sha256": "0e4897ecdfb31456a97c7d8028dfb8d7dbdc632e2f73fc9b438d7b266a139289",
+      "output_sha256": "763ebdbaf2f51a32326d13b3f01117c583928036dafe371a4feb5540d9070728"
+    }
+  },
+  "builtin_mods": {
+    "QuickMatch": {
+      "version": "0.3.0",
+      "local_stand_in": ".local/quickmatch",
+      "files": {
+        "QuickMatch.dll": {
+          "url": "<quickmatch-release>/QuickMatch.dll",
+          "sha256": "594f9385c1723982af8207e93e0af229a235d8698b8e29b7261d591332e35408"
+        },
+        "QuickMatch.json": {
+          "url": "<quickmatch-release>/QuickMatch.json",
+          "sha256": "6042f9e77c6c3028f3da8c9770876d51043c6c50de87c519601a65673e24b62c"
+        }
+      }
+    }
+  },
+  "downloads": {
+    "astc-encoder": {
+      "url": "https://github.com/ARM-software/astc-encoder/archive/bf32abd05eccaf3042170b2a85cebdf0bfee5873.tar.gz",
+      "sha256": "c3563b1c8839c9e737ebe1085f4b0bc0da4189fb19d498309d2735a90de9f8df"
+    },
+    "bcdec": {
+      "url": "https://raw.githubusercontent.com/godotengine/godot/4.5.1-stable/thirdparty/misc/bcdec.h",
+      "sha256": "08b361b4c9516f0ce366386d9f12482a92e4335ca625886a4687b2cdb4a7f5a6"
+    },
+    "library-builder": {
+      "url": "https://api.nuget.org/v3-flatcontainer/microsoft.net.runtime.librarybuilder.sdk/10.0.12/microsoft.net.runtime.librarybuilder.sdk.10.0.12.nupkg",
+      "sha512": "99af0224d974211b068b9218e9de2a918b99c899fba90e3871c4271b9a33243f81d9a8902beeea7c0e8a2c22bea68656f536a47f2ed9a5e22b75bb18fb8badd7"
+    },
+    "dotnet-sdk": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.401/dotnet-sdk-10.0.401-osx-arm64.tar.gz",
+      "sha512": "69f64eb00dc045398755c440b152225d544301a345a146a16e86a56a0c52b7c94b2c331520e976dbb821f18d31930aafbd25bb85961e3517e0665414ce0cbcff"
+    },
+    "dotnet-runtime": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/9.0.10/dotnet-runtime-9.0.10-osx-arm64.tar.gz",
+      "sha512": "cd3365b365c0a8248ffbc34b7a36969969d3301331c5e4d86fa38c8e35536b159c5b0c84cb8bbc6974be8998806bebd4c755446d8177fa612ac730347caddd18"
+    },
+    "godot": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.5.1-stable/Godot_v4.5.1-stable_mono_macos.universal.zip",
+      "sha512": "c990da4273e67be501e05276e68f266fd2175f72d2af5f149c334eaf6f8b79bf09d803c98cc36313725750940f6fa8f274bda90d08ffaa1e8682ddf96dd6c871"
+    },
+    "godot-templates": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.5.1-stable/Godot_v4.5.1-stable_mono_export_templates.tpz",
+      "sha512": "5f4379634ca1cfc176a30da1ca5cee4407cdce0da18e1f60de12a3e7bf497f91b7e525479d90a8c13feaa4bee6a592b4ea332c81ac31501bf76f01804afe76ba"
+    },
+    "fmod": {
+      "url": "https://github.com/utopia-rise/fmod-gdextension/releases/download/6.1.0-4.5.0/addons.zip",
+      "sha256": "8796f6cd1cb38bf7ff4da2648f8af2695244ffdb80a7ac4ab8a171ca44895713"
+    },
+    "fmod-license": {
+      "url": "https://raw.githubusercontent.com/utopia-rise/fmod-gdextension/fda1f89a08c0048ed313b333f90b7a7258ce2e61/LICENSE",
+      "sha256": "ea8964d771136aba8946c18cc66c9ba5f220e8b09ef2b124ce6b2bb8d34f718e"
+    },
+    "spine": {
+      "url": "https://spine-godot.s3.eu-central-1.amazonaws.com/4.2/4.5.1-stable/spine-godot-extension-4.2-4.5.1-stable.zip",
+      "sha256": "47c823a47373374530443c71e6d827df1dd6d441390d95c7cea31c54bc64ee57"
+    }
+  }
+}

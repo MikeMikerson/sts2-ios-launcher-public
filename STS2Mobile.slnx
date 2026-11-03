@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/STS2Mobile.FullGame/STS2Mobile.FullGame.csproj" />
+    <Project Path="src/STS2Mobile.GameAdapters/STS2Mobile.GameAdapters.csproj" />
+    <Project Path="src/STS2Mobile.GameHost/STS2Mobile.GameHost.csproj" />
+    <Project Path="src/STS2Mobile.GamePack/STS2Mobile.GamePack.csproj" />
+    <Project Path="src/STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+    <Project Path="src/STS2Mobile.GameStub/STS2Mobile.GameStub.csproj" />
+    <Project Path="src/STS2Mobile.Launcher/STS2Mobile.Launcher.csproj" />
+    <Project Path="src/STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <Project Path="src/STS2Mobile.Steam/STS2Mobile.Steam.csproj" />
+    <Project Path="src/STS2Mobile.SteamWire/STS2Mobile.SteamWire.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/FullGamePatcher/FullGamePatcher.csproj" />
+    <Project Path="tools/mono/MonoBuildTool/MonoBuildTool.csproj" />
+    <Project Path="tools/SteamAotPatcher/SteamAotPatcher.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ModWeaver.Tests/ModWeaver.Tests.csproj" />
+    <Project Path="tests/GamePack.Tests/GamePack.Tests.csproj" />
+    <Project Path="tests/GamePatcher.Tests/GamePatcher.Tests.csproj" />
+    <Project Path="tests/STS2Mobile.Platform.Tests/STS2Mobile.Platform.Tests.csproj" />
+    <Project Path="tests/STS2Mobile.Steam.Tests/STS2Mobile.Steam.Tests.csproj" />
+    <Project Path="tests/SteamWire.Tests/SteamWire.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/fixtures/">
+    <Project Path="tests/ModWeaver.Tests/fixtures/FakeGame/FakeGame.csproj" />
+    <Project Path="tests/ModWeaver.Tests/fixtures/FakeHarmony/FakeHarmony.csproj" />
+    <Project Path="tests/ModWeaver.Tests/fixtures/GoodMod/GoodMod.csproj" />
+  </Folder>
+</Solution>

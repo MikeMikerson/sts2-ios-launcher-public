@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Makes the game pack the phone mounts from the pack Steam delivers: on the phone in the app (AOT compiled, with no
+       reference to the game). -->
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+  </ItemGroup>
+</Project>

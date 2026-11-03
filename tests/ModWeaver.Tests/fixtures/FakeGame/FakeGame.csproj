@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Stands in for the game assembly: same assembly name, small methods with known behaviour. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>sts2</AssemblyName>
+  </PropertyGroup>
+</Project>

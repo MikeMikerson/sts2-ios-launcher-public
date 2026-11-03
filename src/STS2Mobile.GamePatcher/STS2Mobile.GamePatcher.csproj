@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Turns the game's assembly into the one the phone runs: on the phone in the app (AOT compiled, so it holds no reference
+       to the game), and on the Mac in tools/FullGamePatcher. -->
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <!-- In the build's source copy these sit at the same relative paths (tools/mono/build_mono.py, prepare_tree). -->
+    <RepositoryRoot>$(MSBuildThisFileDirectory)../../</RepositoryRoot>
+    <!-- The game targets net9.0, and the patched game has to name the same framework versions from any host. -->
+    <AdapterFramework>net9.0</AdapterFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <!-- Metadata only, never compiler references or runtime Harmony. The phone has no assembly files for its AOT framework. -->
+    <!-- The pinned SDK already downloads 9.0.20 for net9.0; request it explicitly when building net10.0. -->
+    <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[9.0.20]" Condition="'$(TargetFramework)' != 'net9.0'" />
+    <PackageDownload Include="Lib.Harmony.Ref" Version="[2.4.2]" />
+    <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot)tools/dependencies.json" LogicalName="dependencies.json" />
+    <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot)mods/builtin.json" LogicalName="builtin.json" />
+    <!-- The built-in mods' pinned files, which ./setup.sh puts here (tools/setup_ios.py). The app writes them into the game's
+         original folder at preparation; a build without them prepares the game without those mods. QuickMatch's relay
+         settings are not a mod file: the host embeds them (STS2Mobile.GameHost.csproj). -->
+    <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot).tools/builtin-mods/*" Exclude="$(RepositoryRoot).tools/builtin-mods/*.cfg" LogicalName="mods/%(Filename)%(Extension)" />
+    <!-- Only their signatures, as data: what the patched game calls. The app's own copies are embedded where managed code cannot read their files. -->
+    <AdapterProject Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <AdapterProject Include="../STS2Mobile.GameAdapters/STS2Mobile.GameAdapters.csproj" />
+    <ProjectReference Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <ProjectReference Include="@(AdapterProject)" ReferenceOutputAssembly="false" Private="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=$(AdapterFramework)" />
+  </ItemGroup>
+  <Target Name="EmbedPreparationMetadata" BeforeTargets="AssignTargetPaths;CoreCompile">
+    <ItemGroup>
+      <PreparationMetadata Include="$(NuGetPackageRoot)/microsoft.netcore.app.ref/9.0.20/ref/net9.0/*.dll" />
+      <EmbeddedResource WithCulture="false" Include="@(PreparationMetadata)" LogicalName="metadata/%(PreparationMetadata.Filename)%(PreparationMetadata.Extension)" />
+      <EmbeddedResource WithCulture="false" Include="$(NuGetPackageRoot)/lib.harmony.ref/2.4.2/ref/netstandard2.0/0Harmony.dll" LogicalName="metadata/0Harmony.dll" />
+      <EmbeddedResource WithCulture="false" Include="$(NuGetPackageRoot)/lib.harmony.ref/2.4.2/LICENSE" LogicalName="metadata/Harmony.LICENSE" />
+      <EmbeddedResource WithCulture="false" Include="$(NuGetPackageRoot)/microsoft.netcore.app.ref/9.0.20/LICENSE.TXT" LogicalName="metadata/Framework.LICENSE" />
+      <EmbeddedResource WithCulture="false" Include="$(NuGetPackageRoot)/microsoft.netcore.app.ref/9.0.20/THIRD-PARTY-NOTICES.TXT" LogicalName="metadata/Framework.NOTICES" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(NuGetPackageRoot)/microsoft.netcore.app.ref/9.0.20/ref/net9.0/System.Runtime.dll')" Text="Restore the pinned framework metadata package before building." />
+    <Error Condition="!Exists('$(NuGetPackageRoot)/lib.harmony.ref/2.4.2/ref/netstandard2.0/0Harmony.dll')" Text="Restore the pinned preparation metadata packages before building." />
+  </Target>
+  <Target Name="EmbedAdapterSignatures" BeforeTargets="AssignTargetPaths;CoreCompile" DependsOnTargets="ResolveProjectReferences">
+    <MSBuild Projects="@(AdapterProject)" Targets="GetTargetPath" Properties="TargetFramework=$(AdapterFramework)">
+      <Output TaskParameter="TargetOutputs" ItemName="_AdapterOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource WithCulture="false" Include="@(_AdapterOutput->'%(ReferenceAssembly)')" LogicalName="adapters/%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

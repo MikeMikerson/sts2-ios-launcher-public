@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
+    <ProjectReference Include="../../src/STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+  </ItemGroup>
+</Project>

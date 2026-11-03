@@ -1,0 +1,6 @@
+# The Python packages the tools use, pinned by hash to the wheels for the Python setup.sh installs (3.13) on
+# Apple silicon. setup.sh installs them with --require-hashes and --only-binary, so nothing is built from source.
+lz4==4.4.5 \
+    --hash=sha256:b424df1076e40d4e884cfcc4c77d815368b7fb9ebcd7e634f937725cd9a8a72a
+zstandard==0.25.0 \
+    --hash=sha256:a1a4ae2dec3993a32247995bdfe367fc3266da832d82f8438c8570f989753de1

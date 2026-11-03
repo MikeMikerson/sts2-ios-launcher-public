@@ -1,0 +1,53 @@
+; Host-only settings for the full-game iOS project.
+; The game's own settings (input map, autoloads, display, themes) are NOT kept here. They are read
+; from the pinned game pack and merged with these values by tools/build_full_game_pack.py, which
+; lets every value below win. Keep this file to what the host itself must decide.
+
+config_version=5
+
+[application]
+
+config/name="STS2 Mobile"
+run/main_scene="res://Launcher.tscn"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="sts2-ios-full-game-development"
+config/features=PackedStringArray("4.5", "C#", "Mobile")
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0.118, 0.106, 0.18, 1)
+boot_splash/show_image=false
+; The game's settings have this too. With no game here, a download's log would otherwise wait for the next error.
+run/flush_stdout_on_print=true
+
+[display]
+
+; The same canvas as the game's settings. The launcher sets its own portrait canvas when it starts (LauncherOrientation.cs) and puts
+; this one back before the game starts.
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+; The launcher is portrait and the game landscape: sensor lets every orientation into the plist, and
+; native/orientation_guard.mm decides which one the app is in.
+window/handheld/orientation=6
+; Cards are dragged upward from the bottom edge, which is also the iOS gesture for leaving an app.
+; The engine only asks iOS to hold that gesture back (a first swipe goes to the game, a second one
+; leaves) while the home indicator stays visible; with the indicator hidden the request is ignored.
+window/ios/hide_home_indicator=false
+window/ios/suppress_ui_gesture=true
+
+[dotnet]
+
+project/assembly_name="STS2Mobile.FullGame"
+
+[Fmod]
+
+General/is_live_update_enabled=false
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

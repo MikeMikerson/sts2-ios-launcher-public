@@ -1,0 +1,9 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <ItemGroup>
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <Compile Include="$(MSBuildThisFileDirectory)Shared/*.cs" LinkBase="Shared" />
+    <!-- The same pins the Python tools read; embedded so a tool needs no path to the repository. -->
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)dependencies.json" LogicalName="dependencies.json" />
+  </ItemGroup>
+</Project>
