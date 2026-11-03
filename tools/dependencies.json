@@ -48,7 +48,7 @@
       "files": {
         "QuickMatch.dll": {
           "url": "<quickmatch-release>/QuickMatch.dll",
-          "sha256": "594f9385c1723982af8207e93e0af229a235d8698b8e29b7261d591332e35408"
+          "sha256": "66caccccb251a547d9fb0c076664fc4164dc32fc7d30bc7d3b52f6145b3bf055"
         },
         "QuickMatch.json": {
           "url": "<quickmatch-release>/QuickMatch.json",
