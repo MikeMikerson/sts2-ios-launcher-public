@@ -59,34 +59,56 @@ To build it yourself (with no Mac, see [Install without a Mac](#install-without-
 ## Install without a Mac (Windows)
 
 The app cannot be built on Windows (Apple's tools for iPhone apps run only on a Mac), so this repository's
-GitHub Actions workflow builds it on GitHub's Macs. You sign it with your own Apple ID and install it. You need
-an iPhone and its cable, a Windows PC, a free or paid Apple ID, and a Steam account that owns the game.
+GitHub Actions workflow builds it on GitHub's Macs and publishes it on the **Releases** page as an IPA file.
+
+**What the IPA is.** An unsigned iPhone app. It holds none of the game and no one's personal information.
+An iPhone only installs apps signed by an Apple ID, so a sideloading tool signs it with **your own Apple ID**
+on your PC and installs it. A free Apple ID works. Sideloadly, AltStore and SideStore need no account of their
+own: they only ask for your Apple ID, which they use with Apple to make the signature, and Apple may ask for
+your two-factor code.
+
+**You need:** an iPhone (iOS 15 or later) and its cable, a Windows PC, an Apple ID, and a Steam account that
+owns Slay the Spire 2. The phone needs about 5 GB free during setup and 2.5 GB after.
+
+### With Sideloadly
 
 1. Download the newest `STS2Mobile-<version>.ipa` from this repository's **Releases** page.
 2. On the PC, install iTunes from Apple's website (not the Microsoft Store version), so Windows can talk to
    the iPhone, then install [Sideloadly](https://sideloadly.io).
-3. Connect the iPhone by cable, unlock it and tap **Trust**. Turn on **Settings > Privacy & Security >
-   Developer Mode** and restart it.
-4. Open Sideloadly, drop the IPA on it, pick your iPhone, type your Apple ID and press **Start**.
-5. On the iPhone: **Settings > General > VPN & Device Management**, tap your Apple ID, then **Trust**.
+3. Connect the iPhone by cable, unlock it and tap **Trust**.
+4. Open Sideloadly, drop the IPA on it, pick your iPhone, type your Apple ID and press **Start**. Type the
+   Apple ID password and, if asked, the two-factor code.
+5. On the iPhone, turn on **Settings > Privacy & Security > Developer Mode** and restart. The switch appears
+   only once a sideloaded app is installed; if the iPhone already has it on, skip this.
+6. Trust your Apple ID once: **Settings > General > VPN & Device Management**, tap your Apple ID, then
+   **Trust**.
+7. Open **STS2 Mobile** and follow [First launch](#first-launch): sign in to Steam, and the app downloads the
+   game from Steam.
 
-Every 7 days with a free Apple ID, do step 4 again with the same IPA and the same Apple ID: it installs over
-the old app, so the game, your saves and your sign-in stay. **Do not delete the app from the iPhone.** A free
-Apple ID can have three such apps at once.
+**Every 7 days with a free Apple ID** the app stops opening. Do step 4 again with the same IPA and the same
+Apple ID: it installs over the old app, so the game, your saves and your sign-in stay. **Do not delete the
+app from the iPhone**: that deletes the game and the saves on it. A newer release installs over it the same
+way. A free Apple ID can have three sideloaded apps at once.
 
-**AltStore or SideStore instead of Sideloadly.** Add this source in the app's **Sources** tab, where `<owner>`
-and `<repo>` are this repository's:
+### With AltStore or SideStore
+
+Install [AltStore](https://altstore.io) (with AltServer on the PC) or [SideStore](https://sidestore.io) by their
+own instructions, then add this source in their **Sources** tab:
 
 ```text
-https://github.com/<owner>/<repo>/releases/latest/download/altstore-source.json
+https://github.com/MikeMikerson/sts2-ios-launcher-public/releases/latest/download/altstore-source.json
 ```
 
-AltStore (with AltServer running on the PC) and SideStore then install the app, show updates and renew the 7
-days for you. AltStore and SideStore count toward the three apps.
+Install **STS2 Mobile** from the source, then do steps 5 to 7 above. AltStore and SideStore show new releases
+and renew the 7 days for you (AltStore while AltServer runs on the same Wi-Fi). They count toward the three
+apps.
 
-**Your own build without a Mac.** Fork this repository, open **Actions > Build IPA > Run workflow** in your
-fork, and after about 45 minutes download the IPA from the run's **Artifacts**. Pushing a tag such as `v1.0.0`
-to your fork also makes a release with its own AltStore source.
+### Your own build, still without a Mac
+
+Fork this repository, open **Actions > Build IPA > Run workflow** in your fork, and after about 15 to 20
+minutes download the IPA from the run's **Artifacts** (a zip with the IPA inside). Pushing a tag such as
+`v1.0.0` to your fork also publishes a release with its own AltStore source, at the address above with your
+fork's owner and name.
 
 ## First launch
 
