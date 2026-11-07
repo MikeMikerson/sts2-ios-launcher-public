@@ -12,7 +12,7 @@ The Steam service code retains its upstream MIT notice in `src/STS2Mobile.Steam/
 
 The app runs on the Mono runtime from .NET 10. The build compiles the .NET code ahead of time and embeds it, with the runtime, in one framework. The app's own files are the engine executable (`FullGame`), three frameworks, a small main pack of the host's files (`FullGame.pck`), a placeholder icon and the usual iOS metadata. It holds no separate `.dll` files.
 
-Each person builds the app themselves; no prebuilt app is published. The components below are compiled or linked into that build. The notice files are in the downloaded inputs, at the paths given (all ignored by git).
+The app is built either by each person on their own Mac or by this repository's GitHub Actions workflow, which publishes the unsigned IPA as a release for people with no Mac. The components below are compiled or linked into either build. The notice files are in the downloaded inputs, at the paths given (all ignored by git). Whether the terms of the FMOD, Spine and SteamKit2 components are met by a published IPA is still being checked.
 
 In the main pack (`FullGame.pck`), the launcher's typefaces, each under the SIL Open Font License 1.1, with its license text beside it in the pack and in `src/STS2Mobile.FullGame/fonts/` (tracked, from Google Fonts' repository):
 

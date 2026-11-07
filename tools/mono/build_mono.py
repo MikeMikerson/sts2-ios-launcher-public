@@ -146,6 +146,21 @@ def signing_arguments(unsigned: bool) -> list[str]:
     ]
 
 
+def version_settings(env: dict | None = None) -> list[str]:
+    """The app's version from STS2_APP_VERSION and STS2_APP_BUILD, set by the release workflow. Unset, the export's stays."""
+    env = os.environ if env is None else env
+    settings = []
+    for name, setting in (("STS2_APP_VERSION", "MARKETING_VERSION"), ("STS2_APP_BUILD", "CURRENT_PROJECT_VERSION")):
+        value = env.get(name, "")
+        if not value:
+            continue
+        # Apple's form: up to three dot-separated integers.
+        if not all(part.isdigit() for part in value.split(".")) or value.count(".") > 2:
+            raise ValueError(f"{name} must be one to three numbers separated by dots, not {value!r}.")
+        settings.append(f"{setting}={value}")
+    return settings
+
+
 def prepare_tree() -> None:
     """A copy of the sources, so this build's obj and bin folders stay apart from the host export's."""
     step("Copying the sources")
@@ -312,7 +327,17 @@ def build_app(unsigned: bool) -> None:
     write_main_pack(HOST_EXPORT / "FullGame.pck", EXPORT / "FullGame.pck")
     log = LOGS / f"{LOG_PREFIX}-xcode.log"
     log.unlink(missing_ok=True)
-    command = ["xcodebuild", "-project", "FullGame.xcodeproj", "-configuration", "Release", *arguments, *STRIP_SETTINGS, "build"]
+    command = [
+        "xcodebuild",
+        "-project",
+        "FullGame.xcodeproj",
+        "-configuration",
+        "Release",
+        *arguments,
+        *STRIP_SETTINGS,
+        *version_settings(),
+        "build",
+    ]
     run(command, "xcode", cwd=EXPORT, log=log)
     shutil.rmtree(APP, ignore_errors=True)
     clone(OUT / "xcode/Build/Products/Release-iphoneos/FullGame.app", APP)

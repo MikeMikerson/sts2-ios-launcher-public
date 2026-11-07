@@ -1,0 +1,130 @@
+# Builds the unsigned app from a clean checkout, with no secrets and no game files, for people with no Mac.
+# It runs only by hand (Actions > Build IPA > Run workflow) or when a tag named v* is pushed,
+# never on branch pushes or pull requests. A run by hand keeps the IPA as the run's artifact; a tag also publishes
+# it as a GitHub Release with an AltStore/SideStore source beside it. The scan must pass first, and only the IPA,
+# its icon and the source are uploaded: never logs or analysis/ folders.
+#
+# Install it with Sideloadly, AltStore or SideStore and your own Apple ID (README, "Install without a Mac").
+name: Build IPA
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macOS 27 on Apple silicon. Each xcode-N image holds the Xcode N releases. tools/dependencies.json
+    # names the one this checkout supports, and setup stops if DEVELOPER_DIR selects another.
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      # One bundle id per fork, so an update through AltStore or SideStore keeps the sign-in and the game.
+      # Sideloaders may still change it to suit a free Apple ID; the app works under any id.
+      BUNDLE_ID: io.github.${{ github.repository_owner }}.sts2mobile
+      STS2_APP_BUILD: ${{ github.run_number }}
+    defaults:
+      run:
+        # With an explicit shell, a failure on the left of a pipe fails the step.
+        shell: bash
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set the bundle id and version
+        run: |
+          mkdir -p .local .work/logs
+          bundle="$(printf '%s' "$BUNDLE_ID" | tr '[:upper:]' '[:lower:]')"
+          printf '{\n  "bundle": "%s",\n  "team": ""\n}\n' "$bundle" > .local/signing.json
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "STS2_APP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+          cat .local/signing.json
+
+      - name: Check Xcode
+        run: ./setup.sh --check 2>&1 | tee .work/logs/ci-check.log
+
+      # A clean build peaks at about 15.5 GB in the checkout, and the docs give these runners 14 GB.
+      # Only hosted runners: never delete a self-hosted machine's Xcode or Android SDK.
+      - name: Free disk space
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h .
+          sudo rm -rf /Applications/Xcode_27.app /Applications/Xcode_27.2_Release_Candidate.app
+          rm -rf "$ANDROID_HOME"
+          df -h .
+
+      - name: Prepare the toolchain and the host export
+        run: ./setup.sh --prepare-only 2>&1 | tee .work/logs/ci-prepare.log
+
+      - name: Run the tests
+        run: scripts/test.sh 2>&1 | tee .work/logs/ci-test.log
+
+      - name: Build the unsigned app
+        run: scripts/build-mono.sh --unsigned 2>&1 | tee .work/logs/ci-build.log
+
+      - name: Scan the IPA for game files
+        run: tools/python/bin/python3 tools/scan_no_game_files.py analysis/full-game-mono/FullGame.ipa 2>&1 | tee .work/logs/ci-scan.log
+
+      - name: Check that the build left no file outside the ignored folders
+        run: |
+          git status --porcelain -uall | tee .work/logs/ci-status.log
+          test ! -s .work/logs/ci-status.log
+
+      # The run holds no game file, so these logs cannot quote one. They stay out of the artifacts.
+      - name: Show the end of the newest log
+        if: failure()
+        run: |
+          df -h .
+          newest="$(ls -t .work/logs/*.log analysis/full-game-ios/export.log 2>/dev/null | grep -v '/ci-' | head -1 || true)"
+          echo "$newest"
+          tail -n 40 "$newest"
+
+      - name: Upload the IPA
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: STS2Mobile-unsigned-ipa
+          path: analysis/full-game-mono/FullGame.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release=.work/release
+          mkdir -p "$release"
+          ipa="STS2Mobile-$STS2_APP_VERSION.ipa"
+          cp analysis/full-game-mono/FullGame.ipa "$release/$ipa"
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          tools/python/bin/python3 tools/make_altstore_source.py "$release/$ipa" \
+            --download-url "$base/$ipa" --icon-url "$base/icon.png" \
+            --website "https://github.com/$GITHUB_REPOSITORY" \
+            --notes "Release $GITHUB_REF_NAME." \
+            --output "$release/altstore-source.json"
+          # The icon setup generates: the IPA's own icons are in Apple's altered PNG form.
+          cp src/STS2Mobile.FullGame/icon.png "$release/icon.png"
+          cat > "$release/notes.md" <<EOF
+          Unsigned IPA of STS2 Mobile $GITHUB_REF_NAME. It holds none of Slay the Spire 2: the app downloads the game from Steam after you sign in with an account that owns it.
+
+          Install it with your own Apple ID, from Windows or a Mac, with Sideloadly or AltStore, or add this source to AltStore or SideStore:
+
+          https://github.com/$GITHUB_REPOSITORY/releases/latest/download/altstore-source.json
+
+          See "Install without a Mac" in the README.
+          EOF
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "STS2 Mobile $GITHUB_REF_NAME" --notes-file "$release/notes.md" \
+            "$release/$ipa" "$release/icon.png" "$release/altstore-source.json"

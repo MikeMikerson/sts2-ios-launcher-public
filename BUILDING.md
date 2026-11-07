@@ -58,6 +58,12 @@ The game's code, and the app's code that uses it, runs in Mono's interpreter (Mo
 
 Values already in the file are kept, and other keys in it are left alone. `tools/python/bin/python3 tools/install_app.py` installs the last signed build again, and `--configure-only` only writes the file. `devicectl device install app` over an installed app with the same bundle id and team keeps its container (`Documents`, saves, the downloaded game) and its Keychain items (the Steam sign-in). That is how a free Apple ID's app is renewed after 7 days.
 
+## Releases for people with no Mac
+
+`.github/workflows/build-ipa.yml` runs only by hand or for a pushed `v*` tag. It writes `.local/signing.json` with the bundle id `io.github.<owner>.sts2mobile` (one per repository owner, so AltStore and SideStore updates keep the app's data), runs `./setup.sh --prepare-only`, the tests and `scripts/build-mono.sh --unsigned`, scans the IPA, and keeps it as the run's artifact for 7 days. For a tag it sets `STS2_APP_VERSION` from the tag (`v1.2.0` gives 1.2.0) and `STS2_APP_BUILD` from the run number, and publishes `STS2Mobile-<version>.ipa`, `icon.png` and `altstore-source.json` (from `tools/make_altstore_source.py`, which reads the IPA's `Info.plist`) as a GitHub Release. Pushing a workflow file needs a token with the `workflow` scope.
+
+Locally, `STS2_APP_VERSION` and `STS2_APP_BUILD` set the same two values for `scripts/build-mono.sh`; unset, the app stays 1.0.0 (1.0.0).
+
 ## Game files on the Mac
 
 The app downloads the game itself. `scripts/prepare-game-files.sh` makes the same files on a Mac from the Steam install of the supported version, for the tests on the real game and for copying onto a test install. It reads the installed game and writes only into generated folders:

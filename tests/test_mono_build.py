@@ -362,5 +362,19 @@ class LibraryBuilderPackTests(unittest.TestCase):
         self.assertIn("sha512", spec["downloads"]["library-builder"])
 
 
+class VersionSettingsTests(unittest.TestCase):
+    def test_unset_keeps_the_exports_version(self):
+        self.assertEqual(build_mono.version_settings({}), [])
+
+    def test_release_version_and_build(self):
+        settings = build_mono.version_settings({"STS2_APP_VERSION": "0.2.1", "STS2_APP_BUILD": "17"})
+        self.assertEqual(settings, ["MARKETING_VERSION=0.2.1", "CURRENT_PROJECT_VERSION=17"])
+
+    def test_refuses_what_apple_does_not_accept(self):
+        for value in ("v0.2", "0.2-beta", "1.2.3.4", "1..2", "0.2 "):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                build_mono.version_settings({"STS2_APP_VERSION": value})
+
+
 if __name__ == "__main__":
     unittest.main()

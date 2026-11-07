@@ -1,11 +1,11 @@
 # STS2 Mobile
 
-Play Slay the Spire 2 on your iPhone. You build this app on your own Mac and install it on your own iPhone.
-When you open it and sign in to Steam with an account that owns the game, it downloads the game from Steam
-and prepares it for the phone.
+Play Slay the Spire 2 on your iPhone. Build this app on your own Mac, or, with no Mac, install the
+released IPA from Windows with your own Apple ID. When you open it and sign in to Steam with an account that
+owns the game, it downloads the game from Steam and prepares it for the phone.
 
-This repository holds none of the game, and no ready-made app is published. It is an unofficial fan project,
-not made or endorsed by Mega Crit or Valve.
+Neither this repository nor the released app holds any of the game: you still need to own it on Steam. It is
+an unofficial fan project, not made or endorsed by Mega Crit or Valve.
 
 ## Is it safe?
 
@@ -16,11 +16,14 @@ not made or endorsed by Mega Crit or Valve.
   are taken out.
 - **Nothing happens behind your back.** The game downloads, updates and syncs saves with Steam Cloud only when
   you press the button for it.
-- **You can read every line.** You build the app yourself from this code, so what is here is what runs.
+- **You can read every line.** The app is built from this code, on your Mac or by this repository's
+  GitHub Actions workflow, whose log anyone can read.
 
 The details are in [Security and privacy](#security-and-privacy) below.
 
 ## What you need
+
+To build it yourself (with no Mac, see [Install without a Mac](#install-without-a-mac-windows)):
 
 - A Mac with Apple silicon (M1 or later) and about 20 GB free.
 - Xcode 27.1 (other versions are refused), opened once, with your Apple ID added in **Settings > Apple
@@ -52,6 +55,38 @@ The details are in [Security and privacy](#security-and-privacy) below.
    `--team <id>` or `--device <udid>`.
 4. With a free Apple ID, trust the app once: **Settings > General > VPN & Device Management**, tap your Apple
    ID, then **Trust**.
+
+## Install without a Mac (Windows)
+
+The app cannot be built on Windows (Apple's tools for iPhone apps run only on a Mac), so this repository's
+GitHub Actions workflow builds it on GitHub's Macs. You sign it with your own Apple ID and install it. You need
+an iPhone and its cable, a Windows PC, a free or paid Apple ID, and a Steam account that owns the game.
+
+1. Download the newest `STS2Mobile-<version>.ipa` from this repository's **Releases** page.
+2. On the PC, install iTunes from Apple's website (not the Microsoft Store version), so Windows can talk to
+   the iPhone, then install [Sideloadly](https://sideloadly.io).
+3. Connect the iPhone by cable, unlock it and tap **Trust**. Turn on **Settings > Privacy & Security >
+   Developer Mode** and restart it.
+4. Open Sideloadly, drop the IPA on it, pick your iPhone, type your Apple ID and press **Start**.
+5. On the iPhone: **Settings > General > VPN & Device Management**, tap your Apple ID, then **Trust**.
+
+Every 7 days with a free Apple ID, do step 4 again with the same IPA and the same Apple ID: it installs over
+the old app, so the game, your saves and your sign-in stay. **Do not delete the app from the iPhone.** A free
+Apple ID can have three such apps at once.
+
+**AltStore or SideStore instead of Sideloadly.** Add this source in the app's **Sources** tab, where `<owner>`
+and `<repo>` are this repository's:
+
+```text
+https://github.com/<owner>/<repo>/releases/latest/download/altstore-source.json
+```
+
+AltStore (with AltServer running on the PC) and SideStore then install the app, show updates and renew the 7
+days for you. AltStore and SideStore count toward the three apps.
+
+**Your own build without a Mac.** Fork this repository, open **Actions > Build IPA > Run workflow** in your
+fork, and after about 45 minutes download the IPA from the run's **Artifacts**. Pushing a tag such as `v1.0.0`
+to your fork also makes a release with its own AltStore source.
 
 ## First launch
 
