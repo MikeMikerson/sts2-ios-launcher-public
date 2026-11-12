@@ -13,6 +13,27 @@
 // below forward to those methods on the app delegate, which hands them to every engine service.
 #import <UIKit/UIKit.h>
 
+// Godot's iOS display server sizes its viewport with UIScreen.mainScreen.scale,
+// while touch events use the rendering view's contentScaleFactor. The view and
+// its layer initially cache that scale, so refresh both after a scene change.
+@protocol STS2RenderingView
+@property(nonatomic, readonly) CALayer *renderingLayer;
+@end
+
+static void STS2SyncRenderScale(UIWindow *window) {
+	UIView *view = window.rootViewController.viewIfLoaded;
+	if (![view respondsToSelector:@selector(renderingLayer)]) {
+		return;
+	}
+	CALayer *layer = [(id<STS2RenderingView>)view renderingLayer];
+	CGFloat scale = UIScreen.mainScreen.scale;
+	if (view.contentScaleFactor != scale || (layer && layer.contentsScale != scale)) {
+		view.contentScaleFactor = scale;
+		layer.contentsScale = scale;
+		[view setNeedsLayout];
+	}
+}
+
 // Calls an optional UIApplicationDelegate method that takes the application, if the delegate has it.
 static void STS2ForwardToAppDelegate(SEL selector) {
 	UIApplication *application = UIApplication.sharedApplication;
@@ -43,6 +64,7 @@ static void STS2ForwardToAppDelegate(SEL selector) {
 	window.frame = windowScene.coordinateSpace.bounds;
 	[window makeKeyAndVisible];
 	self.window = window;
+	STS2SyncRenderScale(window);
 }
 
 - (void)windowScene:(UIWindowScene *)windowScene didUpdateEffectiveGeometry:(UIWindowSceneGeometry *)previousGeometry API_AVAILABLE(ios(26.0)) {
@@ -55,9 +77,11 @@ static void STS2ForwardToAppDelegate(SEL selector) {
 		// Godot resizes its rendering layer and viewport when its view lays out at the new size.
 		window.frame = bounds;
 	}
+	STS2SyncRenderScale(window);
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+	STS2SyncRenderScale(self.window);
 	STS2ForwardToAppDelegate(@selector(applicationDidBecomeActive:));
 }
 
