@@ -49,9 +49,9 @@ public sealed class InstalledBuildTests : IDisposable
     {
         File.Copy(Path.Combine(Path.GetDirectoryName(InstalledGame.Data!)!, "release_info.json"), Path.Combine(_game, "release_info.json"));
         var installed = InstalledBuild.Read(_game)!;
-        Assert.Equal(new InstalledBuild(InstalledBuild.BetaBranch, GameProfile.Current.Steam!.Manifest, 0, "0.111.0", Tested: true), installed);
+        Assert.Equal(new InstalledBuild(InstalledBuild.BetaBranch, GameProfile.Current.Steam!.Manifest, 0, "0.113.0", Tested: true), installed);
         // The stamp the app used before profiles were a list, so an install that has warmed up does not do it again.
-        Assert.Equal("v0.111.0-full-game-integration-v1", installed.WarmupId);
+        Assert.Equal("v0.113.0-full-game-integration-v1", installed.WarmupId);
     }
 
     [Fact]
@@ -86,6 +86,19 @@ public sealed class InstalledBuildTests : IDisposable
         Assert.Same(GameProfile.Current, GameProfile.ForAssembly(GameProfile.Current.Inputs[GameProfile.GameAssembly]));
         Assert.Same(GameProfile.Current, GameProfile.ForReleaseInfo(steam.ReleaseInfoSha256));
         Assert.Null(GameProfile.ForManifest(8653035385353091849));
+    }
+
+    [Fact]
+    public void ThePreviousVersionStaysTested()
+    {
+        // A phone still on v0.111.0 keeps playing it as tested after the app moves on to v0.113.0.
+        var previous = Assert.Single(GameProfile.Known, profile => profile.Version == "0.111.0");
+        Assert.NotSame(GameProfile.Current, previous);
+        Assert.Same(previous, GameProfile.ForManifest(5045320271505434676));
+        Assert.Same(previous, GameProfile.ForAssembly("9cb4f1ad8c9f284aa8fec3122ffd6d780bbf543d875c817abdd12ff63fbf12b4"));
+        Assert.Same(previous, GameProfile.ForReleaseInfo("97c0cef5a032ff6ed0826c161f5b72778753e9645c3f6dfe9503b5c3d03a8530"));
+        Assert.Equal("v0.111.0-full-game-integration-v1", previous.WarmupId);
+        Assert.Equal([".godot/imported/orobas.png-7744e6bafdffb9ae994beeceb9e505ae.bptc.ctex"], previous.TexturesKeptOriginal);
     }
 
     [Fact]

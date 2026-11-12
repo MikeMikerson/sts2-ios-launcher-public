@@ -26,9 +26,9 @@ The details are in [Security and privacy](#security-and-privacy) below.
 To build it yourself (with no Mac, see [Install without a Mac](#install-without-a-mac-windows)):
 
 - A Mac with Apple silicon (M1 or later) and about 20 GB free.
-- Xcode 27.1 (other versions are refused), opened once, with your Apple ID added in **Settings > Apple
+- Xcode 27.2 (other versions are refused), opened once, with your Apple ID added in **Settings > Apple
   Accounts**. A free Apple ID works.
-- An iPhone and its cable, with about 5 GB free during setup and 2.5 GB after. Tested on an iPhone 11 Pro;
+- An iPhone and its cable, with about 5.5 GB free during setup and 2.5 GB after. Tested on an iPhone 11 Pro;
   the build allows iOS 15 or later, but other models are untested.
 - A Steam account that owns Slay the Spire 2. The game does not need to be on the Mac.
 
@@ -68,7 +68,7 @@ own: they only ask for your Apple ID, which they use with Apple to make the sign
 your two-factor code.
 
 **You need:** an iPhone (iOS 15 or later) and its cable, a Windows PC, an Apple ID, and a Steam account that
-owns Slay the Spire 2. The phone needs about 5 GB free during setup and 2.5 GB after.
+owns Slay the Spire 2. The phone needs about 5.5 GB free during setup and 2.5 GB after.
 
 ### With Sideloadly
 
@@ -141,7 +141,8 @@ iPhone**: that deletes the game and the saves on it. Saves on the iPhone reach S
 
 ## Game versions
 
-The app has been tested with v0.111.0 from Steam's beta branch. A newer Beta is still offered, marked
+The app has been tested with v0.113.0 from Steam's beta branch, and an iPhone still on v0.111.0 keeps
+playing it as tested. A newer Beta is still offered, marked
 untested, and patched on the iPhone in a tolerant mode; if a change the game needs cannot be made to this
 build, the app tells you then. An untested Stable build is not offered until the app is tested with it. The
 app never updates the game by itself.
@@ -159,7 +160,7 @@ app never updates the game by itself.
 - **The app limit**: a free Apple ID can have 3 of its apps on the iPhone. Delete one of the others.
 - **"Untrusted Developer"**: see step 4. **"Unable to verify app"**: connect the iPhone to the internet and
   trust it again.
-- **"This checkout is validated with Xcode 27.1"**: install that version, or point to it with
+- **"This checkout is validated with Xcode 27.2"**: install that version, or point to it with
   `DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer ./setup.sh --install`.
 - **A tool download fails**: run the command again.
 - **Steam's Stable version is not offered**: choose the Beta if Steam has one, or wait for an update of this

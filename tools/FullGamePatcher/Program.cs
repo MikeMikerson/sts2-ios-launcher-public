@@ -23,7 +23,7 @@ var mods = BuiltInModInput.AtCatalogPaths(File.ReadAllText(args[3]));
 var built = GameAssemblyBuilder.Build(Path.GetDirectoryName(input)!, mods, output, modsOn: mods.Count > 0);
 File.WriteAllText(Path.Combine(output, "profile.json"), JsonSerializer.Serialize(new
 {
-    profile = "v0.111.0-full-game-integration-v2",
+    profile = "v0.113.0-full-game-integration-v2",
     inputSha256 = hash,
     outputSha256 = CecilHelpers.Sha256(Path.Combine(output, GameProfile.GameAssembly)),
     built.RetainedTypes,

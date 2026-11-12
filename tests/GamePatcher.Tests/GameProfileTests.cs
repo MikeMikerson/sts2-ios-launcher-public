@@ -10,7 +10,7 @@ public sealed class GameProfileTests
     public void PinsTheFilesTheAppReads()
     {
         var profile = GameProfile.Current;
-        Assert.Equal("0.111.0", profile.Version);
+        Assert.Equal("0.113.0", profile.Version);
         Assert.Equal(["Sentry.Godot.dll", "Sentry.dll", "sts2.dll"], profile.Inputs.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(["SmartFormat.ZString.dll", "SmartFormat.dll", "Steamworks.NET.dll"], profile.Unchanged.Keys.Order(StringComparer.Ordinal));
         Assert.All(profile.Inputs.Values.Concat(profile.Unchanged.Values), hash => Assert.Equal(64, hash.Length));

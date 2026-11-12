@@ -79,7 +79,7 @@ class ParticlePreprocessLimitTests(unittest.TestCase):
         (assets / "asset-report.json").write_text(
             json.dumps(
                 {
-                    "profile": "v0.111.0-full-assets-v1",
+                    "profile": "v0.113.0-full-assets-v1",
                     "packSha256": "fixture",
                     "staged": [
                         {"path": name, "sha256": hashlib.sha256(data).hexdigest()} for name, data in files.items()

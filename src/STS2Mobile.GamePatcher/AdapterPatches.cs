@@ -51,7 +51,8 @@ internal static class AdapterPatches
     private static void UseAtlasAdapter(GamePatch patch, ModuleDefinition gameAdapters)
     {
         var deserialize = patch.Module.ImportReference(gameAdapters.GetType("STS2Mobile.GameAdapters.AtlasJson").Methods.Single(m => m.Name == "Deserialize"));
-        var atlas = patch.Method("MegaCrit.Sts2.Core.Assets.AtlasManager", "LoadAtlasInternal");
+        // v0.113.0 renamed LoadAtlasInternal to BuildAtlasData, which returns the atlas instead of storing it; the deserialize call is the same.
+        var atlas = patch.Method("MegaCrit.Sts2.Core.Assets.AtlasManager", "BuildAtlasData", "LoadAtlasInternal");
         var call = atlas.Body.Instructions.Single(i => i.Operand is GenericInstanceMethod m && m.DeclaringType.FullName == "System.Text.Json.JsonSerializer" && m.Name == "Deserialize");
         call.Set(OpCodes.Call, deserialize);
         patch.Record(atlas.FullName, "Use source-generated atlas JSON metadata instead of reflection-based serialization.");

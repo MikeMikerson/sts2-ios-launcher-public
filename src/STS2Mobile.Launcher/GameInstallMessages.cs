@@ -17,7 +17,7 @@ public static class GameInstallMessages
     /// <summary>The branch as the player knows it: Stable or Beta.</summary>
     public static string Name(string branch) => branch == GameInstaller.BetaBranch ? "Beta" : "Stable";
 
-    /// <summary>Which build, and whether this app has tested it: "v0.111.0, tested" or "build 23811903, untested".</summary>
+    /// <summary>Which build, and whether this app has tested it: "v0.113.0, tested" or "build 23811903, untested".</summary>
     public static string Describe(GameVersionCheck check) => check.Profile is { } profile
         ? $"v{profile.Version}, tested"
         : check.Build is { BuildId: > 0 } build ? $"build {build.BuildId}, untested" : "untested";
@@ -57,7 +57,7 @@ public static class GameInstallMessages
     /// <summary>The game on this iPhone came from the other branch, so replacing it is a switch, and the saves are backed up first.</summary>
     public static bool IsSwitch(InstalledBuild? installed, string branch) => installed is { Branch.Length: > 0 } && installed.Branch != branch;
 
-    /// <summary>The game on this iPhone, as the version screen and the confirmations name it: "v0.111.0, Beta, tested".</summary>
+    /// <summary>The game on this iPhone, as the version screen and the confirmations name it: "v0.113.0, Beta, tested".</summary>
     public static string Describe(InstalledBuild installed)
     {
         string branch = InstalledBuild.BranchName(installed.Branch);

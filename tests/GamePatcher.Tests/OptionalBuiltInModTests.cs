@@ -61,7 +61,7 @@ public sealed class OptionalBuiltInModTests : IDisposable
     public void TheRepositoryCatalogMarksQuickMatchOptional() =>
         Assert.Contains("QuickMatch", BuiltInModInput.OptionalIds());
 
-    /// <summary>A game folder as a download leaves it, from the Steam install of v0.111.0.</summary>
+    /// <summary>A game folder as a download leaves it, from the Steam install of v0.113.0.</summary>
     private string GameFolder()
     {
         string game = Path.Combine(_work, "game");

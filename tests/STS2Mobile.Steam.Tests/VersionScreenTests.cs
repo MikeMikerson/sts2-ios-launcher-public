@@ -8,11 +8,11 @@ namespace STS2Mobile.Steam.Tests;
 public sealed class VersionScreenTests : IDisposable
 {
     private static readonly ulong TestedManifest = GameProfile.Current.Steam!.Manifest;
-    private static readonly BranchBuild BetaNow = new(GameInstaller.BetaBranch, 24724944, TestedManifest);
+    private static readonly BranchBuild BetaNow = new(GameInstaller.BetaBranch, 26625880, TestedManifest);
     private static readonly BranchBuild StableNow = new(GameInstaller.NormalBranch, 23811903, 8653035385353091849);
     /// <summary>A Stable that has reached the tested build, as the beta will.</summary>
-    private static readonly BranchBuild StableTested = new(GameInstaller.NormalBranch, 24724944, TestedManifest);
-    private static readonly InstalledBuild Beta = new(GameInstaller.BetaBranch, TestedManifest, 24724944, "0.111.0", Tested: true);
+    private static readonly BranchBuild StableTested = new(GameInstaller.NormalBranch, 26625880, TestedManifest);
+    private static readonly InstalledBuild Beta = new(GameInstaller.BetaBranch, TestedManifest, 26625880, "0.113.0", Tested: true);
     private readonly string _root = Directory.CreateTempSubdirectory("version-screen-").FullName;
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
@@ -41,9 +41,9 @@ public sealed class VersionScreenTests : IDisposable
         Assert.Equal([VersionScreen.SwitchToStableLabel, VersionScreen.DeleteLabel], Labels(screen));
         Assert.True(screen.Buttons[0].Primary);
         Assert.True(screen.Buttons[1].Danger);
-        Assert.Equal(new VersionFact("On this iPhone", "v0.111.0, Beta, tested"), screen.Facts[0]);
-        Assert.Equal(new VersionFact("Steam's Stable now", "build 24724944, v0.111.0, tested, the one on this iPhone"), screen.Facts.Single(fact => fact.Label == "Steam's Stable now"));
-        Assert.Equal(new VersionFact("Steam's Beta now", "build 24724944, v0.111.0, tested, the one on this iPhone"), screen.Facts.Single(fact => fact.Label == "Steam's Beta now"));
+        Assert.Equal(new VersionFact("On this iPhone", "v0.113.0, Beta, tested"), screen.Facts[0]);
+        Assert.Equal(new VersionFact("Steam's Stable now", "build 26625880, v0.113.0, tested, the one on this iPhone"), screen.Facts.Single(fact => fact.Label == "Steam's Stable now"));
+        Assert.Equal(new VersionFact("Steam's Beta now", "build 26625880, v0.113.0, tested, the one on this iPhone"), screen.Facts.Single(fact => fact.Label == "Steam's Beta now"));
     }
 
     [Fact]

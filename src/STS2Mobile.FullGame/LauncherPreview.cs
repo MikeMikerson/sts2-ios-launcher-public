@@ -14,11 +14,11 @@ namespace STS2Mobile.FullGame;
 /// </summary>
 public static class LauncherPreview
 {
-    private static readonly LauncherFacts Facts = new(SignedIn: true, AccountName: "player_one", NoGameReason: null, DownloadUnderWay: false, InstalledVersion: "0.111.0",
+    private static readonly LauncherFacts Facts = new(SignedIn: true, AccountName: "player_one", NoGameReason: null, DownloadUnderWay: false, InstalledVersion: "0.113.0",
         InstalledBranch: "Beta");
-    private static readonly BranchBuild BetaNow = new(GameInstaller.BetaBranch, 24724944, GameProfile.Current.Steam!.Manifest);
+    private static readonly BranchBuild BetaNow = new(GameInstaller.BetaBranch, 26625880, GameProfile.Current.Steam!.Manifest);
     private static readonly BranchBuild StableNow = new(GameInstaller.NormalBranch, 23811903, 8653035385353091849);
-    private static readonly InstalledBuild Beta = new(GameInstaller.BetaBranch, BetaNow.ManifestId, BetaNow.BuildId, "0.111.0", Tested: true);
+    private static readonly InstalledBuild Beta = new(GameInstaller.BetaBranch, BetaNow.ManifestId, BetaNow.BuildId, "0.113.0", Tested: true);
     private static readonly InstalledBuild Stable = new(GameInstaller.NormalBranch, StableNow.ManifestId, StableNow.BuildId, "0.103.2", Tested: false,
         [new PatchOutcome("No mouse cursor", false, false, "MegaCrit.Sts2.Core.Nodes.CommonUi.NCursorManager.UpdateCursor is not in this game version."),
          new PatchOutcome("No LAN play", true, true)]);
@@ -117,7 +117,7 @@ public static class LauncherPreview
                 break;
             case "prepare":
                 view.Step = SetupStep.Prepare;
-                view.ShowProgress("Converting the game's textures for this iPhone: 512 of 1243.\nThis happens once. If you leave this app, it carries on from here when you come back.", 512 / 1243.0);
+                view.ShowProgress("Converting the game's textures for this iPhone: 512 of 1566.\nThis happens once. If you leave this app, it carries on from here when you come back.", 512 / 1566.0);
                 break;
             case "choice":
                 view.Step = SetupStep.Download;

@@ -1,6 +1,6 @@
 # Build pipeline
 
-The build uses Godot 4.5.1 .NET, .NET SDK 10.0.401, a .NET 9 runtime for tools, and Xcode 27.1. Setup provisions local tools and verifies dependency archives before extracting them. The dependency manifest specifies the exact sources and checksums.
+The build uses Godot 4.5.1 .NET, .NET SDK 10.0.401, a .NET 9 runtime for tools, and Xcode 27.2. Setup provisions local tools and verifies dependency archives before extracting them. The dependency manifest specifies the exact sources and checksums.
 
 The app's build reads no game file, and needs no Steam install. The game's assemblies are replaced by `STS2Mobile.GameStub`, which holds names only, and the game's files reach the app's data folder on the phone.
 
@@ -120,7 +120,17 @@ These paths are not publication files. Do not share generated game packs or comp
 
 ## Updating inputs
 
-A different game version needs its own patch profile: the patches, their count guards and the input hashes are written for v0.111.0. Never replace expected hashes just to make setup accept a new game build.
+A different game version needs its own patch profile: the patches, their count guards and the input hashes are written for v0.113.0, and still accept v0.111.0, the previous profile. Never replace expected hashes just to make setup accept a new game build.
+
+Moving to a new game version (as done for v0.111.0 to v0.113.0):
+
+1. Install the new build with Steam on the Mac. The depot manifest id is the name of `depotcache/2868842_<manifest>.manifest` and `InstalledDepots` in `steamapps/appmanifest_2868840.acf`.
+2. In `tools/dependencies.json`, move the `game` block unchanged into `previous_game_profiles` (newest first), so a phone on that build stays tested. Write the new `game` block from `shasum -a 256` of the installed files (`release_info.json`, the pack, `sts2.dll` and the other assemblies), never from an error message.
+3. Bump the version in the profile ids together: `tools/profiles.py`, `TextureProfile` in `src/STS2Mobile.GamePack/GamePackBuilder.cs` and the label in `tools/FullGamePatcher/Program.cs`. Set `GAME_PACK_ENTRIES` in `tools/stage_full_game.py` from the new pack's directory.
+4. Run `./setup.sh --prepare-only` and `scripts/prepare-game-files.sh`, and fix each patch that fails in `src/STS2Mobile.GamePatcher`. Phones on the previous profile run the same patches, so a renamed target is found by either name (`GamePatch.Method(type, name, earlierName)`). Compare the patch report (`analysis/full-game-managed/public/game/profile.json`) with the previous version's, and look at every method whose patch moved.
+5. Copy `keptOriginal` from `analysis/full-game-textures-astc-v1/texture-report.json` into `textures_kept_original`.
+6. Build QuickMatch against the new game and run its tests (its repository says how). The weave check sees only the calls a mod makes, not the abstract members it must implement, so a game that changed QuickMatch's base types needs a new QuickMatch release, pinned here.
+7. Run `scripts/test.sh`, build, and set up the new version on a phone. Measure setup's peak disk use for `peak_disk_bytes`, play a fight, and only then pin the installed-game tests' output hashes.
 
 Python packages are pinned by wheel hash in `tools/requirements.txt`; to change one, replace its version and its `--hash` with the values PyPI lists for the `cp313` macOS arm64 wheel. NuGet packages are locked in the `packages*.lock.json` next to each project: the plain file for ordinary builds and tests, and one per runtime (`packages.ios-arm64.lock.json`, and `.mono` for the Mono publish) for the iOS publishes, whose dependencies differ. After changing a package reference, run the restores once with `RestoreLockedMode=false` in the environment (for example `RestoreLockedMode=false ./setup.sh`, `scripts/build-mono.sh` and `scripts/test.sh`), check the changed lock files and commit them.
 
@@ -130,7 +140,7 @@ QuickMatch's relay is not in its release: whoever builds chooses it. `QUICKMATCH
 
 ## Troubleshooting
 
-- **Unsupported game hash (game files only):** supply the supported v0.111.0 installation. A matching version label alone is insufficient.
+- **Unsupported game hash (game files only):** supply the supported v0.113.0 installation. A matching version label alone is insufficient.
 - **Missing Xcode components:** finish Xcode's first-launch setup and install its iOS platform.
 - **Signing error:** check `team` in `.local/device.json` is your own team, signed in to Xcode. Do not copy another person's certificate or provisioning profile.
 - **Stale prepared inputs:** rerun `./setup.sh`, then reopen or rebuild the generated project.

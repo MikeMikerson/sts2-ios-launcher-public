@@ -7,9 +7,9 @@ writes needs a new profile name here.
 import json
 from pathlib import Path
 
-ASSET_PROFILE = "v0.111.0-full-assets-v1"
-TEXTURE_PROFILE = "v0.111.0-textures-astc4x4-v1"
-SCENE_PROFILE = "v0.111.0-phone-scenes-v1"
+ASSET_PROFILE = "v0.113.0-full-assets-v1"
+TEXTURE_PROFILE = "v0.113.0-textures-astc4x4-v1"
+SCENE_PROFILE = "v0.113.0-phone-scenes-v1"
 
 
 def load_asset_report(assets: Path) -> dict:

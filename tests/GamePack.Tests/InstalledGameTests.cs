@@ -85,14 +85,14 @@ public sealed class ConvertedTextures : IDisposable
 }
 
 /// <summary>
-/// The app's pack on v0.111.0 against what the Python tools make. Update the pin when a step changes on purpose, and only after
+/// The app's pack on v0.113.0 against what the Python tools make. Update the pin when a step changes on purpose, and only after
 /// a fight on the phone: nothing else tells whether the new pack plays.
 /// </summary>
 public sealed class InstalledGameTests(ConvertedTextures textures) : IDisposable, IClassFixture<ConvertedTextures>
 {
     /// <summary>What <c>build_game_pack</c> wrote: the pack first played on the phone.</summary>
-    private const string PlayedSha256 = "08ebec892d526ad8de089f5b1765df5792d28f513167be19ec7cf40d7a96e69e";
-    private const int PlayedEntries = 12574;
+    private const string PlayedSha256 = "fefb38650f03041d981cc85fc42e6c9969202b1b6ea3a3593351649e01ae0ce7";
+    private const int PlayedEntries = 13704;
 
     private readonly string _work = Directory.CreateTempSubdirectory("installed-pack-").FullName;
 
@@ -113,7 +113,7 @@ public sealed class InstalledGameTests(ConvertedTextures textures) : IDisposable
     [InstalledGameFact]
     public void TheConvertedTexturesAreThePythonToolsByteForByte()
     {
-        Assert.Equal(1243, textures.Result.Total);
+        Assert.Equal(1566, textures.Result.Total);
         Assert.Equal(InstalledGame.Sha(InstalledGame.ReferenceTextures), InstalledGame.Sha(textures.Pack));
     }
 

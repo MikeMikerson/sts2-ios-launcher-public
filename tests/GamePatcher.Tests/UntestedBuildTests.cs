@@ -4,12 +4,12 @@ using STS2Mobile.GamePatcher;
 namespace STS2Mobile.GamePatcher.Tests;
 
 /// <summary>
-/// Tolerant mode on the real game. A build with no profile is stood in for by v0.111.0 itself and by copies with one method renamed,
-/// since no other build's files are on this Mac. Skipped where there is no Steam install of v0.111.0.
+/// Tolerant mode on the real game. A build with no profile is stood in for by v0.113.0 itself and by copies with one method renamed,
+/// since no other build's files are on this Mac. Skipped where there is no Steam install of v0.113.0.
 /// </summary>
 public sealed class UntestedBuildTests : IDisposable
 {
-    private const string PlayedSha256 = "4897d2067b695faf5d193a5e0e4ab763c62c75b157f6f6e6c75ecd2b1c4a800a";
+    private const string PlayedSha256 = "3e19bd89eaa166ad658311bc952ceaa80d51fdcbd6a460c8986c5db7241b6c30";
     private readonly string _work = Directory.CreateTempSubdirectory("untested-build-").FullName;
 
     public void Dispose() => Directory.Delete(_work, recursive: true);

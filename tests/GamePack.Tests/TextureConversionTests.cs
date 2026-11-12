@@ -12,8 +12,9 @@ public sealed class TextureConversionTests : IDisposable
     /// <summary>
     /// What these made-up textures become, from a build whose output matched the Mac's on all the game's textures. It catches a change
     /// to the encoder, but not a missing -ffp-contract=off: these bytes stay the same without it. Only InstalledGameTests catches that.
+    /// The texture profile id is written into the overlay manifest, so a new game version's id changes it too.
     /// </summary>
-    private const string MadeUpTexturesSha256 = "1c43022b7ea441311707c92149ab781a9ad90689db7af3dcb1e0fe2ab50ec527";
+    private const string MadeUpTexturesSha256 = "b70311c48e5add7ed1002764fb767eb4fe540aeb1d9ede5df3462f6cd0bafd37";
     private static readonly TextureConversionOptions Small = new(Workers: 2, LargeThreads: 2, BatchBytes: 64 * 1024, LargeBytes: 48 * 1024);
     private readonly string _work = Directory.CreateTempSubdirectory("texture-conversion-").FullName;
     private readonly string _folder;

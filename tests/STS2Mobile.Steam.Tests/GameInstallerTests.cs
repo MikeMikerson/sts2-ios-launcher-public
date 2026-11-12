@@ -327,8 +327,8 @@ public sealed class RealManifestTests : IDisposable
             Assert.Equal(new FileInfo(installed).Length, (long)file.Source.TotalSize);
         }
         Assert.InRange(GameInstaller.DownloadBytes(plan), 1_100_000_000, 1_300_000_000);
-        // The estimate from the manifest covers what v0.111.0 was measured to need.
-        Assert.InRange(GameInstaller.PeakDiskBytes(null, plan), GameProfile.Current.Steam.PeakDiskBytes, 5_100_000_000);
+        // The estimate from the manifest covers what v0.113.0 needs at its fullest: Steam's files, the converted textures and the game's pack.
+        Assert.InRange(GameInstaller.PeakDiskBytes(null, plan), GameProfile.Current.Steam.PeakDiskBytes, 5_500_000_000);
     }
 
     /// <summary>Steam's normal version has no profile and no <c>Sentry.Godot.dll</c>: its plan is Steam's hashes alone, with that file left out.</summary>

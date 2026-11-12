@@ -11,7 +11,7 @@ namespace STS2Mobile.GamePack;
 public static class GamePackBuilder
 {
     public const string TextureManifest = "texture-overlay.json";
-    public const string TextureProfile = "v0.111.0-textures-astc4x4-v1";
+    public const string TextureProfile = "v0.113.0-textures-astc4x4-v1";
     private const string Settings = "project.binary";
     private const string UidCache = ".godot/uid_cache.bin";
     private const string ClassCache = ".godot/global_script_class_cache.cfg";

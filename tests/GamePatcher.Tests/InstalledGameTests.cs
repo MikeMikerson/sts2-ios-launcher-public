@@ -36,16 +36,16 @@ internal static class InstalledGame
 }
 
 /// <summary>
-/// The app's preparation on v0.111.0, pinned to the assembly first played on the phone. Update the pin when a patch changes on purpose, and only
+/// The app's preparation on v0.113.0, pinned to the assembly first played on the phone. Update the pin when a patch changes on purpose, and only
 /// after a fight on the phone: nothing else tells whether the new assembly plays.
 /// </summary>
 public sealed class InstalledGameTests : IDisposable
 {
     /// <summary>The patched assembly with no mods, byte for byte the one first played on the phone.</summary>
-    private const string PlayedSha256 = "4897d2067b695faf5d193a5e0e4ab763c62c75b157f6f6e6c75ecd2b1c4a800a";
+    private const string PlayedSha256 = "3e19bd89eaa166ad658311bc952ceaa80d51fdcbd6a460c8986c5db7241b6c30";
 
     /// <summary>The same with the launcher's mods switch on and no mods: <see cref="PlayedSha256"/> plus the mods agreement.</summary>
-    internal const string ModsOnSha256 = "732c0023e6aaad3e17e1cd68e97fb5d77251afe81c9ec73f3a563da7e5f4ad33";
+    internal const string ModsOnSha256 = "e32c9b7be3ae58c7c9f90e78ac8d301dfbe4aca4d472c665f6b254cbbf348079";
 
     private readonly string _work = Directory.CreateTempSubdirectory("installed-game-").FullName;
 

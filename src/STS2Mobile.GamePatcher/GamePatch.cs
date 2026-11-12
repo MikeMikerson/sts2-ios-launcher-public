@@ -25,6 +25,10 @@ internal sealed class GamePatch(AssemblyDefinition assembly, ModuleDefinition pl
 
     public MethodDefinition Method(string type, string name) => Only(Type(type).Methods.Where(m => m.Name == name), type + "." + name);
 
+    /// <summary>A method a newer tested version renamed: the one that has either name, since phones on an older profile run these patches too.</summary>
+    public MethodDefinition Method(string type, string name, string earlierName) =>
+        Only(Type(type).Methods.Where(m => m.Name == name || m.Name == earlierName), $"{type}.{name} (earlier {earlierName})");
+
     /// <summary>The one match, or a failure that names what this game version lacks, for the report.</summary>
     private static T Only<T>(IEnumerable<T> matches, string what) => matches.Take(2).ToArray() switch
     {
