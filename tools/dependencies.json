@@ -72,11 +72,11 @@
       "local_stand_in": ".local/quickmatch",
       "files": {
         "QuickMatch.dll": {
-          "url": "<quickmatch-release>/QuickMatch.dll",
+          "url": "https://github.com/MikeMikerson/sts2-quickmatch/releases/download/v0.3.1/QuickMatch.dll",
           "sha256": "4c556b610a2be84eda0a81cc0800ee8264ba41ea6f9561514f3c13a51a8a4cfc"
         },
         "QuickMatch.json": {
-          "url": "<quickmatch-release>/QuickMatch.json",
+          "url": "https://github.com/MikeMikerson/sts2-quickmatch/releases/download/v0.3.1/QuickMatch.json",
           "sha256": "cf15b3eb81d3845906f6094c23308da8448b1be6ba7098c5815ffde9d1948fef"
         }
       }
