@@ -45,6 +45,18 @@ static void STS2ForwardToAppDelegate(SEL selector) {
 	self.window = window;
 }
 
+- (void)windowScene:(UIWindowScene *)windowScene didUpdateEffectiveGeometry:(UIWindowSceneGeometry *)previousGeometry API_AVAILABLE(ios(26.0)) {
+	UIWindow *window = self.window;
+	if (!window || window.windowScene != windowScene) {
+		return;
+	}
+	CGRect bounds = windowScene.effectiveGeometry.coordinateSpace.bounds;
+	if (!CGRectIsEmpty(bounds) && !CGRectEqualToRect(window.frame, bounds)) {
+		// Godot resizes its rendering layer and viewport when its view lays out at the new size.
+		window.frame = bounds;
+	}
+}
+
 - (void)sceneDidBecomeActive:(UIScene *)scene {
 	STS2ForwardToAppDelegate(@selector(applicationDidBecomeActive:));
 }
