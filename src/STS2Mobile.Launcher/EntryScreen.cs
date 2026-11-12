@@ -19,8 +19,9 @@ public enum EntryKind
 /// <param name="InstalledVersion">The game version on this iPhone, as the player knows it, or null.</param>
 /// <param name="InstalledBranch">Stable or Beta, if known.</param>
 /// <param name="UpdateAvailable">Steam's build of that branch, as the version screen last saw it, is another one.</param>
+/// <param name="OwnershipConfirmed">The stored sign-in has passed Steam's ownership check, so Play needs no connection.</param>
 public sealed record LauncherFacts(bool SignedIn, string? AccountName, string? NoGameReason, bool DownloadUnderWay, string? InstalledVersion,
-    string? InstalledBranch = null, bool UpdateAvailable = false, bool ModsEnabled = false);
+    string? InstalledBranch = null, bool UpdateAvailable = false, bool ModsEnabled = false, bool OwnershipConfirmed = false);
 
 /// <summary>One row of the home screen: what it is about, and how that stands now. The label is also the button the row is.</summary>
 public sealed record HomeRow(string Label, string Value);
@@ -38,6 +39,7 @@ public sealed record EntryScreen(EntryKind Kind, string Heading, string Status, 
     public const string NoGame = "The game is not on this iPhone yet.";
     public const string DownloadUnderWay = "The download stopped before it finished.\nIt carries on from where it was.";
     public const string Ready = "The game is on this iPhone. Nothing is sent to Steam until you press Play.";
+    public const string ReadyOffline = "The game is on this iPhone. Play needs no connection to Steam, so it works offline too.";
 
     public const string GameVersionRow = "Game version";
     public const string CloudSavesRow = "Cloud saves";
@@ -65,6 +67,6 @@ public sealed record EntryScreen(EntryKind Kind, string Heading, string Status, 
             new(AccountRow, facts.AccountName ?? "Signed in"),
             new(ModsRow, facts.ModsEnabled ? "On, tap to turn off" : "Off, tap to turn on"),
         ];
-        return new(EntryKind.Home, "Slay the Spire 2", message ?? Ready, "Play", rows, failed, true);
+        return new(EntryKind.Home, "Slay the Spire 2", message ?? (facts.OwnershipConfirmed ? ReadyOffline : Ready), "Play", rows, failed, true);
     }
 }

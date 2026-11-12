@@ -67,10 +67,10 @@ public sealed class SteamLobbyService : IDisposable
     /// <summary>The lobbies we are in.</summary>
     public IReadOnlyCollection<ulong> Joined => _joined.Keys.ToArray();
 
-    /// <summary>Creates a lobby we own and are in; null when Steam refused.</summary>
+    /// <summary>Creates a lobby we own and are in; null when Steam refused or could not be reached.</summary>
     public async Task<ulong?> CreateAsync(ELobbyType type, int maxMembers, CancellationToken ct)
     {
-        var matchmaking = await ConnectedAsync(ct).ConfigureAwait(false);
+        if (await ConnectedAsync("Lobby creation", ct).ConfigureAwait(false) is not { } matchmaking) return null;
         var job = matchmaking.CreateLobby(_appId, type, maxMembers);
         if (job == null)
         {
@@ -92,7 +92,7 @@ public sealed class SteamLobbyService : IDisposable
 
     public async Task<EChatRoomEnterResponse> JoinAsync(ulong lobby, CancellationToken ct)
     {
-        var matchmaking = await ConnectedAsync(ct).ConfigureAwait(false);
+        if (await ConnectedAsync("Lobby join", ct).ConfigureAwait(false) is not { } matchmaking) return EChatRoomEnterResponse.Error;
         var job = matchmaking.JoinLobby(_appId, lobby);
         if (job == null)
         {
@@ -140,11 +140,11 @@ public sealed class SteamLobbyService : IDisposable
 
     /// <summary>
     /// Lobbies of our app worldwide whose data holds every value in <paramref name="equal"/> and that have at least
-    /// <paramref name="minFreeSlots"/> free slots. Null when Steam reported an error.
+    /// <paramref name="minFreeSlots"/> free slots. Null when Steam reported an error or could not be reached.
     /// </summary>
     public async Task<IReadOnlyList<LobbySummary>?> SearchAsync(IReadOnlyDictionary<string, string> equal, int minFreeSlots, int maxResults, CancellationToken ct)
     {
-        var matchmaking = await ConnectedAsync(ct).ConfigureAwait(false);
+        if (await ConnectedAsync("Lobby search", ct).ConfigureAwait(false) is not { } matchmaking) return null;
         var job = matchmaking.GetLobbyList(_appId, Filters(equal, minFreeSlots), maxResults);
         if (job == null)
         {
@@ -258,8 +258,23 @@ public sealed class SteamLobbyService : IDisposable
         }
     }
 
-    /// <summary>Connecting blocks, so it happens on a worker thread rather than the game's.</summary>
-    private Task<SteamMatchmaking> ConnectedAsync(CancellationToken ct) => Task.Run(() => _connection.Matchmaking, ct);
+    /// <summary>
+    /// Connecting blocks, so it happens on a worker thread rather than the game's. Null when Steam cannot be reached, for example
+    /// offline, since the game may start without a connection: the caller answers as a refusal, which QuickMatch reports to the
+    /// player, rather than throwing into the game.
+    /// </summary>
+    private async Task<SteamMatchmaking?> ConnectedAsync(string request, CancellationToken ct)
+    {
+        try
+        {
+            return await Task.Run(() => _connection.Matchmaking, ct).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.Warn(Tag, $"{request} not sent: Steam could not be reached ({error.GetType().Name}: {error.Message})");
+            return null;
+        }
+    }
 
     /// <summary>Called once Steam has put us in <paramref name="lobby"/>.</summary>
     internal void Hold(ulong lobby)

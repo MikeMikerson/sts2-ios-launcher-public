@@ -146,7 +146,11 @@ public partial class Launcher : Control
         _view.ShowProgress("Verifying Steam ownership...", -1, canGoBack: true);
     }
 
-    private void Play() => RunAsync(_view.Step == null ? null : SetupStep.Play, "Verifying Steam ownership...", _login.ConnectAndVerifyAsync, StartGameAsync).FireAndForget("Play");
+    /// <summary>
+    /// A sign-in that has passed Steam's ownership check starts the game here with no connection, so Play works offline. An older sign-in
+    /// that has not yet kept its Steam ID verifies once, which keeps it.
+    /// </summary>
+    private void Play() => RunAsync(_view.Step == null ? null : SetupStep.Play, "Starting the game...", _login.PrepareToPlayAsync, StartGameAsync).FireAndForget("Play");
 
     /// <summary>Makes the game's assembly and pack from what is in the folder, offering to try again if that fails.</summary>
     private async Task<PreparationResult> PrepareGameAsync()
@@ -239,7 +243,8 @@ public partial class Launcher : Control
         if (underWay) _noGameReason ??= NoGame;
         bool signedIn = _login.HasStoredCredentials;
         var (version, branch, update) = _noGameReason == null ? InstalledSummary() : default;
-        var screen = EntryScreen.For(new LauncherFacts(signedIn, signedIn ? _login.AccountName : null, _noGameReason, underWay, version, branch, update, ModLaunchSettings.Enabled), message, failed);
+        var screen = EntryScreen.For(new LauncherFacts(signedIn, signedIn ? _login.AccountName : null, _noGameReason, underWay, version, branch, update, ModLaunchSettings.Enabled,
+            _login.OwnershipConfirmed), message, failed);
         _view.Step = screen.Kind switch
         {
             EntryKind.SignIn => _noGameReason != null ? SetupStep.SignIn : null,
@@ -377,9 +382,10 @@ public partial class Launcher : Control
     {
         await _saves.OfferAsync(attempt);
         _view.ShowProgress("Starting the game...", -1);
-        RuntimeServices.BindOwnershipVerifier(() => _login.VerifyOwnershipAsync(_stop.Token));
+        // The game's own start check: answered from the stored sign-in, which Play has just required, so it needs no connection either.
+        RuntimeServices.BindOwnershipVerifier(() => Task.FromResult(_login.OwnershipConfirmed));
         RuntimeServices.BindAccount(_login.SteamId, _login.PlayerName);
-        // Steam lobbies for a built-in multiplayer mod. Binding sends nothing; the first lobby request connects.
+        // Steam lobbies for a built-in multiplayer mod. Binding sends nothing; the first lobby request connects, and offline it fails as a refusal.
         _lobbies = new SteamLobbies(_login.Connection, _login.SteamId, GodotSteamLogger.Instance);
         RuntimeServices.BindLobbies(_lobbies);
         SessionStats.Mark("game-start");

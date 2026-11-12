@@ -19,6 +19,10 @@ public static class RuntimeServices
             throw new InvalidOperationException("An ownership verifier is already bound.");
     }
 
+    /// <summary>
+    /// The game's own start check (NGame.InitializePlatform). The launcher answers it from the stored sign-in, which has passed Steam's
+    /// ownership check, so it needs no connection and the game starts offline too.
+    /// </summary>
     public static async Task<bool> RequireOwnershipAsync()
     {
         var verifier = _verifyOwnership ?? throw new InvalidOperationException("Steam sign-in and ownership verification are required.");

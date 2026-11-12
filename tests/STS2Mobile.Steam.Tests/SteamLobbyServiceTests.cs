@@ -165,6 +165,27 @@ public sealed class SteamLobbyServiceTests : IDisposable
         Assert.Empty(SteamLobbyService.Filters(new Dictionary<string, string>(), 0).OfType<SteamMatchmaking.Lobby.SlotsAvailableFilter>());
     }
 
+    [Fact]
+    public async Task OfflineASearchHostOrJoinIsRefusedRatherThanThrown()
+    {
+        // The game may have started with no connection; connecting then fails as it does with no network.
+        _connection.Unreachable = new TimeoutException("Steam connection timed out");
+        Assert.Null(await _service.SearchAsync(new Dictionary<string, string>(), 1, 10, CancellationToken.None));
+        Assert.Null(await _service.CreateAsync(ELobbyType.FriendsOnly, 4, CancellationToken.None));
+        Assert.Equal(EChatRoomEnterResponse.Error, await _service.JoinAsync(Lobby, CancellationToken.None));
+        Assert.Empty(_service.Joined);
+        Assert.Equal(0, _connection.Holds);
+    }
+
+    [Fact]
+    public async Task ACancelledRequestIsStillCancelledOffline()
+    {
+        _connection.Unreachable = new TimeoutException("Steam connection timed out");
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => _service.SearchAsync(new Dictionary<string, string>(), 1, 10, cancelled.Token));
+    }
+
     /// <summary>Steam's answer to a join, owned by <see cref="Friend"/>, then the service told it is in.</summary>
     private void Joined()
     {
@@ -205,7 +226,9 @@ public sealed class SteamLobbyServiceTests : IDisposable
         public SteamClient Client { get; }
         public CallbackManager Callbacks { get; }
         public bool IsConnected { get; set; } = true;
-        public SteamMatchmaking Matchmaking => Client.GetHandler<SteamMatchmaking>()!;
+        /// <summary>Set, connecting throws it, as a connection with no network does.</summary>
+        public Exception? Unreachable { get; set; }
+        public SteamMatchmaking Matchmaking => Unreachable is { } error ? throw error : Client.GetHandler<SteamMatchmaking>()!;
         public int Holds { get; private set; }
         public IDisposable Subscribe<TCallback>(Action<TCallback> handler) where TCallback : CallbackMsg => Callbacks.Subscribe(handler);
         public void SuspendIdleTimeout() => Holds++;

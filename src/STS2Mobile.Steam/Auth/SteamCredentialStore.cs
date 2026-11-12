@@ -3,7 +3,10 @@ using STS2Mobile.Steam.Abstractions;
 
 namespace STS2Mobile.Steam.Auth;
 
-/// <summary>The signed-in account's name and refresh token, encrypted with <see cref="ISecureStorage"/>.</summary>
+/// <summary>
+/// The signed-in account's name and refresh token, encrypted with <see cref="ISecureStorage"/>. Once Steam has confirmed that this sign-in
+/// owns the game, the account's Steam ID and Steam name are kept beside them, so the game can start without a connection.
+/// </summary>
 public sealed class SteamCredentialStore
 {
     private const string Tag = "Credentials";
@@ -24,6 +27,15 @@ public sealed class SteamCredentialStore
     public string? RefreshToken => _credentials?.RefreshToken;
 
     public bool HasCredentials => _credentials is { AccountName: not null, RefreshToken: not null };
+
+    /// <summary>The account's Steam ID, kept only once Steam has confirmed this sign-in owns the game; null before then.</summary>
+    public ulong? SteamId => _credentials?.SteamId is > 0 ? _credentials.SteamId : null;
+
+    /// <summary>The account's Steam name as Steam last sent it, kept with <see cref="SteamId"/>; null if Steam had not sent one.</summary>
+    public string? PersonaName => _credentials?.PersonaName;
+
+    /// <summary>A sign-in is stored and Steam has confirmed, with it, that the account owns the game.</summary>
+    public bool OwnershipConfirmed => HasCredentials && SteamId != null;
 
     public void Load()
     {
@@ -48,10 +60,48 @@ public sealed class SteamCredentialStore
         }
     }
 
-    /// <summary>Replaces the stored credentials. False when they could not be encrypted or written.</summary>
+    /// <summary>
+    /// Replaces the stored credentials. A new sign-in has not been checked for the game yet, so no Steam ID is kept with it. False when
+    /// they could not be encrypted or written.
+    /// </summary>
     public bool Save(string accountName, string refreshToken)
     {
         var credentials = new SteamCredentials { AccountName = accountName, RefreshToken = refreshToken };
+        if (!Write(credentials)) return false;
+        _credentials = credentials;
+        return true;
+    }
+
+    /// <summary>
+    /// Steam has just confirmed that the stored sign-in owns the game: keeps the account's Steam ID and Steam name with it. A name Steam
+    /// did not send this time keeps the one stored for the same account. Kept in memory even if the file cannot be written, so this
+    /// launch can still play; the next launch then asks Steam again. False when the file was not written.
+    /// </summary>
+    public bool RecordOwnership(ulong steamId, string? personaName)
+    {
+        if (_credentials is not { AccountName: not null, RefreshToken: not null } current) throw new InvalidOperationException("No stored sign-in to record ownership for.");
+        if (steamId == 0) throw new ArgumentException("Authenticated Steam ID required.", nameof(steamId));
+        string? name = !string.IsNullOrWhiteSpace(personaName) ? personaName : current.SteamId == steamId ? current.PersonaName : null;
+        if (current.SteamId == steamId && current.PersonaName == name) return true;
+        var credentials = new SteamCredentials { AccountName = current.AccountName, RefreshToken = current.RefreshToken, SteamId = steamId, PersonaName = name };
+        _credentials = credentials;
+        return Write(credentials);
+    }
+
+    /// <summary>
+    /// Steam said the account does not own the game (for example after a refund): the sign-in stays, but no longer starts the game
+    /// without asking Steam. Forgotten in memory even if the file cannot be written.
+    /// </summary>
+    public bool ForgetOwnership()
+    {
+        if (_credentials is not { SteamId: not null } current) return true;
+        var credentials = new SteamCredentials { AccountName = current.AccountName, RefreshToken = current.RefreshToken };
+        _credentials = credentials;
+        return Write(credentials);
+    }
+
+    private bool Write(SteamCredentials credentials)
+    {
         string temporary = $"{_path}.{Guid.NewGuid():N}.tmp";
         try
         {
@@ -64,6 +114,7 @@ public sealed class SteamCredentialStore
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             File.WriteAllText(temporary, encrypted);
             File.Move(temporary, _path, overwrite: true);
+            return true;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -74,8 +125,6 @@ public sealed class SteamCredentialStore
         {
             File.Delete(temporary);
         }
-        _credentials = credentials;
-        return true;
     }
 
     /// <summary>
@@ -109,11 +158,18 @@ public sealed class SteamCredentialStore
         return fileGone || keyGone;
     }
 
-    /// <summary>What the file holds. Files written before Steam Guard data was dropped still carry a GuardData field, which reading skips.</summary>
+    /// <summary>
+    /// What the file holds. Files written before Steam Guard data was dropped still carry a GuardData field, which reading skips. Files
+    /// written before offline play have no Steam ID, so the next Play asks Steam once, as it always did, and keeps it.
+    /// </summary>
     internal sealed class SteamCredentials
     {
         public string? AccountName { get; set; }
 
         public string? RefreshToken { get; set; }
+
+        public ulong? SteamId { get; set; }
+
+        public string? PersonaName { get; set; }
     }
 }

@@ -5,9 +5,11 @@ using STS2Mobile.Steam.Auth;
 
 namespace STS2Mobile.Steam.Tests;
 
-// The stored sign-in: what the file keeps, and signing out, which asks Steam to end the sign-in and forgets it here whatever Steam says.
+// The stored sign-in: what the file keeps, playing with it and no connection once Steam has confirmed ownership, and signing out, which
+// asks Steam to end the sign-in and forgets it here whatever Steam says.
 public sealed class SignOutTests : IDisposable
 {
+    private const ulong Player = 76561198000000001;
     private readonly string _root = Directory.CreateTempSubdirectory("sign-out-").FullName;
     private readonly FakeKeychain _keychain = new();
     private string CredentialsFile => Path.Combine(_root, "steam_credentials.enc");
@@ -39,6 +41,119 @@ public sealed class SignOutTests : IDisposable
         var store = Store();
         Assert.True(store.HasCredentials);
         Assert.Equal("refresh-token", store.RefreshToken);
+        // Written before offline play: the sign-in works, and the next Play asks Steam once.
+        Assert.False(store.OwnershipConfirmed);
+        Assert.Null(store.SteamId);
+    }
+
+    [Fact]
+    public void ANewSignInIsNotConfirmedUntilSteamHasCheckedIt()
+    {
+        var store = Store();
+        Assert.Throws<InvalidOperationException>(() => store.RecordOwnership(Player, "Name"));
+        Assert.True(store.Save("player_one", "refresh-token"));
+        Assert.False(store.OwnershipConfirmed);
+        Assert.Null(store.SteamId);
+        Assert.Throws<ArgumentException>(() => store.RecordOwnership(0, "Name"));
+        Assert.False(store.OwnershipConfirmed);
+    }
+
+    [Fact]
+    public void ConfirmedOwnershipIsKeptEncryptedWithTheSignIn()
+    {
+        var store = Store();
+        store.Save("player_one", "refresh-token");
+        Assert.True(store.RecordOwnership(Player, "Player One"));
+        Assert.Contains($"\"SteamId\":{Player}", _keychain.Decrypt(File.ReadAllText(CredentialsFile))!);
+
+        var reread = Store();
+        Assert.True(reread.OwnershipConfirmed);
+        Assert.Equal(Player, reread.SteamId);
+        Assert.Equal("Player One", reread.PersonaName);
+        Assert.Equal("refresh-token", reread.RefreshToken);
+    }
+
+    [Fact]
+    public void ANameSteamDidNotSendKeepsTheOneStoredForTheSameAccount()
+    {
+        var store = Store();
+        store.Save("player_one", "refresh-token");
+        store.RecordOwnership(Player, "Player One");
+        store.RecordOwnership(Player, null);
+        Assert.Equal("Player One", Store().PersonaName);
+        store.RecordOwnership(Player, "Renamed");
+        Assert.Equal("Renamed", Store().PersonaName);
+        store.RecordOwnership(Player + 1, null);
+        Assert.Null(Store().PersonaName);
+    }
+
+    [Fact]
+    public void SigningInAgainNeedsItsOwnOwnershipCheck()
+    {
+        var store = Store();
+        store.Save("player_one", "refresh-token");
+        store.RecordOwnership(Player, "Player One");
+        store.Save("player_two", "other-token");
+        Assert.False(store.OwnershipConfirmed);
+        Assert.False(Store().OwnershipConfirmed);
+        Assert.Null(Store().PersonaName);
+    }
+
+    [Fact]
+    public void ACheckThatFailsLaterKeepsTheSignInButEndsPlayWithoutSteam()
+    {
+        var store = Store();
+        store.Save("player_one", "refresh-token");
+        store.RecordOwnership(Player, "Player One");
+        Assert.True(store.ForgetOwnership());
+        Assert.False(store.OwnershipConfirmed);
+        var reread = Store();
+        Assert.True(reread.HasCredentials);
+        Assert.False(reread.OwnershipConfirmed);
+        Assert.Null(reread.PersonaName);
+    }
+
+    [Fact]
+    public void AConfirmedSignInPlaysWithItsStoredIdentityAndNoConnection()
+    {
+        var stored = Store();
+        stored.Save("player_one", "refresh-token");
+        stored.RecordOwnership(Player, "Player One");
+        using var session = new SteamLoginSession(_root, _keychain, new QuietLogger(), (_, _, _) => Task.CompletedTask);
+
+        Assert.True(session.OwnershipConfirmed);
+        Assert.True(session.PrepareToPlayAsync(CancellationToken.None).IsCompletedSuccessfully);
+        Assert.Equal(Player, session.SteamId);
+        Assert.Equal("Player One", session.PlayerName);
+        // Lobbies get a connection that has not connected; it connects when first used.
+        Assert.False(session.Connection.IsConnected);
+    }
+
+    [Fact]
+    public void WithoutAStoredSteamNameThePlayerIsCalledByTheAccountName()
+    {
+        var stored = Store();
+        stored.Save("player_one", "refresh-token");
+        stored.RecordOwnership(Player, null);
+        using var session = new SteamLoginSession(_root, _keychain, new QuietLogger(), (_, _, _) => Task.CompletedTask);
+        Assert.Equal("player_one", session.PlayerName);
+    }
+
+    [Fact]
+    public async Task SigningOutEndsPlayWithoutSteam()
+    {
+        var stored = Store();
+        stored.Save("player_one", "refresh-token");
+        stored.RecordOwnership(Player, "Player One");
+        using var session = new SteamLoginSession(_root, _keychain, new QuietLogger(), (_, _, _) => Task.CompletedTask);
+        await session.SignOutAsync(CancellationToken.None);
+
+        Assert.False(session.OwnershipConfirmed);
+        Assert.Throws<InvalidOperationException>(() => session.SteamId);
+        Assert.Throws<InvalidOperationException>(() => session.Connection);
+        // With no sign-in, Play stops before anything goes to Steam.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.PrepareToPlayAsync(CancellationToken.None));
+        Assert.False(Store().OwnershipConfirmed);
     }
 
     [Fact]

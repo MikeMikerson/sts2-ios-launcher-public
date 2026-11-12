@@ -7,9 +7,10 @@ using STS2Mobile.Steam.Connection;
 namespace STS2Mobile.Launcher;
 
 /// <summary>
-/// Steam sign-in and ownership verification for the launcher. Only a refresh token is ever stored,
-/// in protected storage. A password is handed straight to SteamKit, which encrypts it for Steam; it
-/// is never stored or logged here.
+/// Steam sign-in and ownership verification for the launcher. Only the account name and a refresh token
+/// are stored, in protected storage, and, once Steam has confirmed the account owns the game, its Steam
+/// ID and Steam name. A password is handed straight to SteamKit, which encrypts it for Steam; it is never
+/// stored or logged here.
 /// </summary>
 public sealed class SteamLoginSession : IDisposable
 {
@@ -36,19 +37,38 @@ public sealed class SteamLoginSession : IDisposable
         _credentials.Load();
     }
 
-    public SteamConnection Connection => _connection ?? throw new InvalidOperationException("Not signed in.");
+    /// <summary>
+    /// The connection on the stored sign-in. Made here without connecting when nothing has connected yet in this launch (a Play that
+    /// needed no Steam): it connects when first used, for example by a lobby.
+    /// </summary>
+    public SteamConnection Connection => _connection ??= _credentials.HasCredentials
+        ? new SteamConnection(_credentials.AccountName!, _credentials.RefreshToken!, _logger)
+        : throw new InvalidOperationException("Not signed in.");
 
-    public ulong SteamId => Connection.Client.SteamID?.ConvertToUInt64() ?? throw new InvalidOperationException("No authenticated Steam ID.");
+    /// <summary>The account's Steam ID: the one kept when Steam confirmed the sign-in owns the game, so no connection is needed.</summary>
+    public ulong SteamId => _credentials.SteamId ?? LiveSteamId ?? throw new InvalidOperationException("No authenticated Steam ID.");
+
+    private ulong? LiveSteamId => _connection?.Client.SteamID?.ConvertToUInt64() is > 0 and var id ? id : null;
 
     public string AccountName => _credentials.AccountName ?? throw new InvalidOperationException("Not signed in.");
 
     /// <summary>
-    /// The name the game shows for the local player: the account's Steam name, as other players see it, or the sign-in's account
-    /// name if Steam has not sent it.
+    /// The name the game shows for the local player: the account's Steam name, as other players see it, from this launch's connection
+    /// or as stored at the last one, or the sign-in's account name if Steam has never sent it.
     /// </summary>
-    public string PlayerName => Connection.PersonaName ?? AccountName;
+    public string PlayerName => _connection?.PersonaName ?? _credentials.PersonaName ?? AccountName;
 
     public bool HasStoredCredentials => _credentials.HasCredentials;
+
+    /// <summary>
+    /// The stored sign-in has passed Steam's ownership check, so Play and the game's own start check need no connection: the game on
+    /// this iPhone could only be downloaded after that check. Signing out, or a later check that fails, ends it.
+    /// </summary>
+    public bool OwnershipConfirmed => _credentials.OwnershipConfirmed;
+
+    /// <summary>What Play does before the game starts: nothing once ownership is confirmed, otherwise connects and verifies once.</summary>
+    public Task PrepareToPlayAsync(CancellationToken cancellationToken) =>
+        OwnershipConfirmed ? Task.CompletedTask : ConnectAndVerifyAsync(cancellationToken);
 
     /// <summary>
     /// For players who have Steam on a second device to scan the challenge.
@@ -110,6 +130,7 @@ public sealed class SteamLoginSession : IDisposable
     private void Retain(AuthPollResult result)
     {
         // Only the account name and refresh token are kept. Steam's Guard data is not: nothing reads it, as a stored sign-in renews with the token alone.
+        // A new sign-in replaces any Steam ID kept for the last one, so it plays without Steam only after its own ownership check.
         if (!_credentials.Save(result.AccountName, result.RefreshToken))
             throw new InvalidOperationException("Could not retain Steam authentication securely.");
     }
@@ -135,7 +156,7 @@ public sealed class SteamLoginSession : IDisposable
         }
     }
 
-    public Task<bool> VerifyOwnershipAsync(CancellationToken cancellationToken) =>
+    private Task<bool> VerifyOwnershipAsync(CancellationToken cancellationToken) =>
         OwnershipVerifier.VerifyAsync(Connection).WaitAsync(cancellationToken);
 
     public async Task ConnectAndVerifyAsync(CancellationToken cancellationToken)
@@ -167,8 +188,16 @@ public sealed class SteamLoginSession : IDisposable
                 await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken).ConfigureAwait(false);
             }
         }
-        if (!owns) throw new UnauthorizedAccessException("The signed-in Steam account does not own Slay the Spire 2.");
-        if (SteamId == 0) throw new InvalidOperationException("Steam did not provide an authenticated account identity.");
+        if (!owns)
+        {
+            // For example a refund: this sign-in no longer starts the game without asking Steam.
+            _credentials.ForgetOwnership();
+            throw new UnauthorizedAccessException("The signed-in Steam account does not own Slay the Spire 2.");
+        }
+        ulong steamId = LiveSteamId ?? throw new InvalidOperationException("Steam did not provide an authenticated account identity.");
+        // Kept with the sign-in, so from now on Play and the game's own check need no connection, and the game gets the same identity offline.
+        if (!_credentials.RecordOwnership(steamId, _connection!.PersonaName))
+            _logger.Warn("Ownership", "Confirmed ownership could not be stored; the next launch asks Steam again");
     }
 
     /// <summary>

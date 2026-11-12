@@ -117,9 +117,11 @@ scanned with the Steam app), checks that you own the game, downloads it (about 1
 minutes) and warms up its effects (about 6 minutes, once). Keep the app open meanwhile; if it is interrupted
 it carries on where it stopped. When it asks, close the app and open it again.
 
-After that it opens on **Play**. Below it, **Game version** updates, switches or deletes the game, **Cloud
-saves** gets your saves from Steam Cloud or sends them there, **Steam account** changes the account or signs
-out, and **Mods** manages mods. None of them touch your saves without asking.
+After that it opens on **Play**, which starts the game without connecting to Steam, so you can play offline:
+your ownership was already checked when you signed in and downloaded. Below it, **Game version** updates,
+switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud or sends them there, **Steam
+account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
+asking.
 
 ## Every 7 days, with a free Apple ID
 
@@ -176,12 +178,22 @@ This section is for anyone who wants to check the claims above. Each point names
 - The app signs in with SteamKit2, an open-source Steam client library, directly to Steam's servers. Your
   password goes only there and is never written to disk. The QR sign-in sends no password at all.
 - The sign-in is kept on this iPhone: only your account name and the refresh token Steam issues (no
-  password, no Steam Guard data), in one file encrypted with **AES-256-GCM**
+  password, no Steam Guard data), and, once Steam has confirmed that the account owns the game, its Steam ID
+  and Steam name, in one file encrypted with **AES-256-GCM**
   (`src/STS2Mobile.FullGame/KeychainSecureStorage.cs`). The key is random, 256 bits, and kept only in the
   **iOS Keychain** (`src/STS2Mobile.Platform/AppleKeychain.cs`), readable only while the iPhone is unlocked
   and only on this device (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`). It is never in iCloud or device
   backups and does not move to another phone; without it the file is useless, and the app asks you to sign
   in again.
+- Steam checks that the account owns the game when you sign in and before every download, update or switch
+  of version (`src/STS2Mobile.Steam/Auth/OwnershipVerifier.cs`). Play does not ask again: the game could only
+  be downloaded after that check, so Play and the game's own start check use the stored sign-in, its Steam ID
+  and Steam name, and need no connection (`src/STS2Mobile.Launcher/SteamLoginSession.cs`). A sign-in stored
+  by an older version of the app has no Steam ID yet, so its next Play checks with Steam once. Signing out
+  ends this, and so does a later check that finds the account no longer owns the game. Offline, Cloud saves
+  and Game version say that Steam could not be reached, and QuickMatch cannot find or host a match. The one
+  wait is the first Play on an iPhone with no saves yet, which still offers your Steam Cloud saves: offline,
+  that gives up after about 15 seconds and the game starts.
 - **Steam account > Sign out** signs out of Steam on this iPhone: it deletes the stored sign-in and its key,
   and asks Steam to end the sign-in. The game and your saves stay, and you sign in again to play. If Steam
   cannot be reached it still signs out on the phone, and you can remove the sign-in under **Authorized
