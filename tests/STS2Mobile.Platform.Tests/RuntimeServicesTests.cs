@@ -31,6 +31,19 @@ public class RuntimeServicesTests
     }
 
     [Fact]
+    public async Task AnAnswerFromTheStoredSignInPassesWithoutWaiting()
+    {
+        // What the launcher binds: the stored sign-in's confirmed ownership, with no connection, so the game also starts offline.
+        RuntimeServices.BindOwnershipVerifier(() => Task.FromResult(true));
+        RuntimeServices.BindAccount(76561198000000001, "Stored Name");
+        Task<bool> check = RuntimeServices.RequireOwnershipAsync();
+        Assert.True(check.IsCompletedSuccessfully);
+        Assert.True(await check);
+        Assert.Equal(76561198000000001ul, RuntimeServices.GetLocalPlayerId());
+        Assert.Equal("Stored Name", RuntimeServices.GetPlayerName(76561198000000001));
+    }
+
+    [Fact]
     public void PlayerNamesComeFromTheBoundAccountOnly()
     {
         Assert.Throws<InvalidOperationException>(() => RuntimeServices.GetLocalPlayerId());

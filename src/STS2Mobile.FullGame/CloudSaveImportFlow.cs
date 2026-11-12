@@ -56,7 +56,12 @@ public sealed class CloudSaveImportFlow
                 return;
             }
             if (hasSaves) GD.Print("Steam Cloud saves not offered: this iPhone has saves. Get and Send are on the cloud saves screen.");
-            else await DownloadAsync(imports, onRequest: false, attempt);
+            else
+            {
+                // Play may not have connected, so this can be the first request to Steam; offline it fails after the connection's timeout and the game starts.
+                _view.ShowProgress("Asking Steam Cloud which saves it has...", -1, canGoBack: true);
+                await DownloadAsync(imports, onRequest: false, attempt);
+            }
             return;
         }
         string found = $"Steam Cloud saves are ready on this iPhone: {pending.Profiles} profiles, {pending.FinishedRuns} finished runs"
@@ -122,7 +127,8 @@ public sealed class CloudSaveImportFlow
         using var cloud = new CloudClient(_login.Connection, GodotSteamLogger.Instance);
         var downloader = new CloudSaveDownloader(cloud);
         List<CloudFileInfo> saves;
-        try { saves = (await downloader.ListAsync(attempt)).Where(file => SaveImportStore.IsImportable(file.Name)).ToList(); }
+        // Connecting blocks its caller, so the listing, which may be what connects, runs off the UI thread, and Back does not wait for it.
+        try { saves = (await Task.Run(() => downloader.ListAsync(attempt), attempt).WaitAsync(attempt)).Where(file => SaveImportStore.IsImportable(file.Name)).ToList(); }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             GD.PushError("Steam Cloud saves could not be listed: " + error.GetType().Name + ": " + error.Message);

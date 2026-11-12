@@ -24,7 +24,10 @@ internal sealed class PhoneLobbyBackend : ILobbyBackend
         lobbies.Changed += update => Changed?.Invoke(new LobbyEvent(Kind(update.Change), update.Lobby, update.Member, update.Data));
     }
 
-    /// <summary>The game only starts after Steam sign-in and the ownership check.</summary>
+    /// <summary>
+    /// The game only starts with a sign-in that has passed Steam's ownership check, though perhaps with no connection now: lobbies connect
+    /// when first used, and offline a search, host or join fails as a refusal, which QuickMatch reports.
+    /// </summary>
     public bool IsAvailable => true;
 
     public ulong LocalId => _lobbies.LocalId;

@@ -39,6 +39,14 @@ public sealed class EntryScreenTests
         Assert.False(screen.OfferSignInAgain);
     }
 
+    [Fact]
+    public void ASignInWhoseOwnershipIsConfirmedSaysPlayWorksOffline()
+    {
+        Assert.Equal(EntryScreen.Ready, EntryScreen.For(WithGame).Status);
+        Assert.Equal(EntryScreen.ReadyOffline, EntryScreen.For(WithGame with { OwnershipConfirmed = true }).Status);
+        Assert.Equal(EntryScreen.WelcomeNoGame, EntryScreen.For(WithGame with { SignedIn = false, NoGameReason = EntryScreen.NoGame, OwnershipConfirmed = true }).Status);
+    }
+
     [Theory]
     [InlineData(false, "Off, tap to turn on")]
     [InlineData(true, "On, tap to turn off")]
