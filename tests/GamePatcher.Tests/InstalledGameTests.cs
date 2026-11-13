@@ -42,10 +42,10 @@ internal static class InstalledGame
 public sealed class InstalledGameTests : IDisposable
 {
     /// <summary>The patched assembly with no mods, byte for byte the one first played on the phone.</summary>
-    private const string PlayedSha256 = "3e19bd89eaa166ad658311bc952ceaa80d51fdcbd6a460c8986c5db7241b6c30";
+    private const string PlayedSha256 = "c00cf938078c407dbf9af5616d0e4a665ae779bc68a08a5e31223ff149dc983e";
 
     /// <summary>The same with the launcher's mods switch on and no mods: <see cref="PlayedSha256"/> plus the mods agreement.</summary>
-    internal const string ModsOnSha256 = "e32c9b7be3ae58c7c9f90e78ac8d301dfbe4aca4d472c665f6b254cbbf348079";
+    internal const string ModsOnSha256 = "63a6fb1788b417ec9f0d0206261f94890cb6463ab6f6bf0f5fce6c32c527d64f";
 
     private readonly string _work = Directory.CreateTempSubdirectory("installed-game-").FullName;
 

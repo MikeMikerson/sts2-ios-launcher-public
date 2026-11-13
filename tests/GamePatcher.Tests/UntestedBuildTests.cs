@@ -9,7 +9,7 @@ namespace STS2Mobile.GamePatcher.Tests;
 /// </summary>
 public sealed class UntestedBuildTests : IDisposable
 {
-    private const string PlayedSha256 = "3e19bd89eaa166ad658311bc952ceaa80d51fdcbd6a460c8986c5db7241b6c30";
+    private const string PlayedSha256 = "c00cf938078c407dbf9af5616d0e4a665ae779bc68a08a5e31223ff149dc983e";
     private readonly string _work = Directory.CreateTempSubdirectory("untested-build-").FullName;
 
     public void Dispose() => Directory.Delete(_work, recursive: true);
@@ -120,7 +120,8 @@ public sealed class UntestedBuildTests : IDisposable
         Assert.Equal(
         [
             "No JIT warmup", "No Steam invite dialog", "Mods from the app's own folder", "Mods screen opens Files", "Fewer background loads at once, to bound memory",
-            "No mouse cursor", "A card let go below the play zone goes back", "The game fills the screen", "The game's version read from its folder",
+            "No mouse cursor", "A card let go below the play zone goes back", "The game fills the screen", "The game keeps clear of the notch and the island",
+            "The game's version read from its folder",
         ], steps.Where(step => !step.Required).Select(step => step.Name));
     }
 }

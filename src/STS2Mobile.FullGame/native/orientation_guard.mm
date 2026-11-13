@@ -64,8 +64,29 @@ extern "C" __attribute__((visibility("default"))) void sts2_orientation_set(int 
 	STS2KeepOrientation();
 }
 
-// Holding the function here keeps the linker from removing it: nothing in the app calls it directly, the managed host finds it by name.
-__attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&sts2_orientation_set};
+// The game's side margin in landscape (STS2Mobile.Platform/SafeAreaCanvas.cs): the larger of the key window's left and right
+// safe-area insets, as a fraction of its width. iOS reports the same inset on both sides of a phone with a notch or an island,
+// and it also clears the rounded corners. 0 in portrait, before there is a window, and on a screen with no inset. Called on the
+// main thread, where the engine runs the game.
+extern "C" __attribute__((visibility("default"))) double sts2_screen_side_inset(void) {
+	for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+		if (![scene isKindOfClass:UIWindowScene.class]) {
+			continue;
+		}
+		for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+			CGSize size = window.bounds.size;
+			if (!window.isKeyWindow || size.width <= size.height) {
+				continue;
+			}
+			UIEdgeInsets insets = window.safeAreaInsets;
+			return MAX(insets.left, insets.right) / size.width;
+		}
+	}
+	return 0;
+}
+
+// Holding the functions here keeps the linker from removing them: nothing in the app calls them directly, the managed side finds them by name.
+__attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&sts2_orientation_set, (void *)&sts2_screen_side_inset};
 
 @interface STS2OrientationGuard : NSObject
 @end

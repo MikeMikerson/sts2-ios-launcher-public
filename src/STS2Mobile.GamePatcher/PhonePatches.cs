@@ -15,6 +15,7 @@ internal static class PhonePatches
             patch.Noop(patch.Method("MegaCrit.Sts2.Core.Nodes.CommonUi.NCursorManager", "UpdateCursor"), "No mouse cursor on a touchscreen.")),
         new("A card let go below the play zone goes back", false, CancelCardReleasedBelowPlayZone),
         new("The game fills the screen", false, FillScreen),
+        new("The game keeps clear of the notch and the island", false, KeepClearOfTheNotch),
         new("The game's version read from its folder", false, ReadReleaseInfoFromGameFolder),
     ];
 
@@ -72,6 +73,64 @@ internal static class PhonePatches
         foreach (var instruction in cancel) il.InsertBefore(resume, instruction);
         cardPlayInput.Body.OptimizeMacros();
         patch.Record(cardPlayInput.FullName, "Put a picked-up card back when the touch is released below the play zone.");
+    }
+
+    // The game's automatic aspect ratio stretches its canvas over the whole window, so on a phone with a notch or a Dynamic Island
+    // the island and the rounded corners covered what the game anchors to its left and right edges. Both of its handlers now ask
+    // SafeAreaCanvas for the canvas, which letterboxes it inside the safe area there and keeps the game's own rule elsewhere. Each
+    // keeps its check that the setting is automatic; only what follows it is replaced.
+    private static void KeepClearOfTheNotch(GamePatch patch)
+    {
+        FitCanvasToSafeArea(patch, patch.Method("MegaCrit.Sts2.Core.Nodes.CommonUi.NGlobalUi", "OnWindowChange"));
+        FitCanvasToSafeArea(patch, patch.Method("MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMainMenu", "OnWindowChange"));
+    }
+
+    private static void FitCanvasToSafeArea(GamePatch patch, MethodDefinition handler)
+    {
+        var body = handler.Body;
+        var code = body.Instructions;
+        static bool Calls(Instruction i, string name) => i.OpCode == OpCodes.Callvirt && ((MethodReference)i.Operand).Name == name;
+        // The game's own references: the window field, its size, the two setters and Vector2I's fields and constructor.
+        var window = (FieldReference)code.First(i => i.OpCode == OpCodes.Ldfld && ((FieldReference)i.Operand).Name == "_window").Operand;
+        var getSize = (MethodReference)code.First(i => Calls(i, "get_Size")).Operand;
+        var setAspect = (MethodReference)code.First(i => Calls(i, "set_ContentScaleAspect")).Operand;
+        var setSize = (MethodReference)code.First(i => Calls(i, "set_ContentScaleSize")).Operand;
+        var x = (FieldReference)code.First(i => i.OpCode == OpCodes.Ldfld && ((FieldReference)i.Operand).Name == "X").Operand;
+        var y = (FieldReference)code.First(i => i.OpCode == OpCodes.Ldfld && ((FieldReference)i.Operand).Name == "Y").Operand;
+        var vector = (MethodReference)code.First(i => i.OpCode == OpCodes.Newobj).Operand;
+        // The layout starts at the first read of the window; everything before it is the check that the setting is automatic.
+        int start = Enumerable.Range(0, code.Count - 1).First(n => code[n].OpCode == OpCodes.Ldarg_0 && code[n + 1].OpCode == OpCodes.Ldfld &&
+            ((FieldReference)code[n + 1].Operand).Name == "_window");
+        if (start == 0 || code.Skip(start).Count(i => Calls(i, "set_ContentScaleAspect")) != 3)
+            throw new InvalidOperationException(handler.FullName + " is not the game's automatic aspect ratio.");
+
+        var il = body.GetILProcessor();
+        var oldStart = code[start];
+        var width = new VariableDefinition(patch.Module.TypeSystem.Int32);
+        var height = new VariableDefinition(patch.Module.TypeSystem.Int32);
+        body.Variables.Clear();
+        body.Variables.Add(width);
+        body.Variables.Add(height);
+        var fit = new[]
+        {
+            il.Create(OpCodes.Ldarg_0), il.Create(OpCodes.Ldfld, window),
+            il.Create(OpCodes.Ldarg_0), il.Create(OpCodes.Ldfld, window), il.Create(OpCodes.Callvirt, getSize), il.Create(OpCodes.Ldfld, x),
+            il.Create(OpCodes.Ldarg_0), il.Create(OpCodes.Ldfld, window), il.Create(OpCodes.Callvirt, getSize), il.Create(OpCodes.Ldfld, y),
+            il.Create(OpCodes.Ldloca, width), il.Create(OpCodes.Ldloca, height),
+            il.Create(OpCodes.Call, patch.Adapter("SafeAreaCanvas", "Layout")),
+            il.Create(OpCodes.Callvirt, setAspect),
+            il.Create(OpCodes.Ldarg_0), il.Create(OpCodes.Ldfld, window),
+            il.Create(OpCodes.Ldloc, width), il.Create(OpCodes.Ldloc, height), il.Create(OpCodes.Newobj, vector),
+            il.Create(OpCodes.Callvirt, setSize),
+            il.Create(OpCodes.Ret),
+        };
+        // The check's branch to the layout goes to the new one, then the old layout goes.
+        foreach (var instruction in fit) il.InsertBefore(oldStart, instruction);
+        foreach (var branch in code.Where(i => i.Operand == oldStart)) branch.Operand = fit[0];
+        int end = start + fit.Length;
+        while (code.Count > end) il.RemoveAt(end);
+        body.OptimizeMacros();
+        patch.Record(handler.FullName, "Letterbox the automatic aspect ratio's canvas inside the safe area, clear of the notch, the island and the rounded corners.");
     }
 
     // A phone has one window that always covers the screen. The game's saved aspect ratio (16:9 unless
