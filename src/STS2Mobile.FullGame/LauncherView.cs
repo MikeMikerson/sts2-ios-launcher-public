@@ -25,6 +25,7 @@ public sealed partial class LauncherView
     private const string CloseLabel = "Close the app";
     private readonly Control _root;
     private readonly MarginContainer _frame;
+    private readonly ScrollContainer _pageScroll;
     private readonly Label _heading;
     private readonly Label _status;
     private readonly PanelContainer _notice;
@@ -88,9 +89,17 @@ public sealed partial class LauncherView
         root.AddChild(new ColorRect { Color = LauncherTheme.Dusk, AnchorRight = 1, AnchorBottom = 1, MouseFilter = Control.MouseFilterEnum.Ignore });
         _frame = new MarginContainer { AnchorRight = 1, AnchorBottom = 1 };
         root.AddChild(_frame);
+        _pageScroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Disabled
+        };
+        _frame.AddChild(_pageScroll);
         var page = new VBoxContainer();
+        page.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        page.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         page.AddThemeConstantOverride("separation", 36);
-        _frame.AddChild(page);
+        _pageScroll.AddChild(page);
 
         _back = LauncherTheme.MakeButton("Back", LauncherTheme.QuietButton, () => BackRequested?.Invoke());
         _back.Alignment = HorizontalAlignment.Left;
@@ -319,6 +328,11 @@ public sealed partial class LauncherView
         _status.Text = status;
         foreach (Control control in _switchable) control.Visible = Array.IndexOf(visible, control) >= 0;
         SwitchCloudControls(visible);
+        // Long confirmations can push their buttons past the bottom on short displays.
+        _pageScroll.VerticalScrollMode = _choiceFirst.Visible
+            ? ScrollContainer.ScrollMode.Auto
+            : ScrollContainer.ScrollMode.Disabled;
+        _pageScroll.ScrollVertical = 0;
         _heading.Visible = heading != null;
         _status.Visible = status.Length > 0;
         _spacer.Visible = !form;
@@ -438,7 +452,9 @@ public sealed partial class LauncherView
     private void FitToScreen()
     {
         Vector2 canvas = _root.GetViewportRect().Size;
-        Vector2I window = DisplayServer.WindowGetSize();
+        // Godot reports the iOS safe area in rendering-layer pixels. Use the
+        // same layer dimensions when converting the insets to canvas units.
+        Vector2I window = DisplayServer.ScreenGetSize();
         Rect2I safe = DisplayServer.GetDisplaySafeArea();
         float scale = window.X > 0 ? canvas.X / window.X : 1;
         bool known = safe.Size.X > 0 && safe.Size.Y > 0 && window.X > 0;
