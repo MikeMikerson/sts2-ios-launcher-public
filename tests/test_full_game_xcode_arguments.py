@@ -77,6 +77,7 @@ class NativeUnitTests(unittest.TestCase):
         self.assertIn("game_files.mm", NATIVE_UNITS)
         self.assertIn("setup_overlay.mm", NATIVE_UNITS)
         self.assertIn("voice_audio.mm", NATIVE_UNITS)
+        self.assertIn("gpu_watch.mm", NATIVE_UNITS)
         for name, (_, build_id, _) in NATIVE_UNITS.items():
             self.assertIn(f"{build_id} /* {name} in Sources */,", sources)
 

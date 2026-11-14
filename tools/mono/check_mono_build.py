@@ -20,6 +20,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE.parent))
 
 import mono_library as library  # noqa: E402
+import patch_fmod_file_thread  # noqa: E402
 from hashing import sha256_file  # noqa: E402
 
 OUT = ROOT / "analysis/full-game-mono"
@@ -264,6 +265,24 @@ def voice_audio(facts: Facts) -> list[str]:
     )
 
 
+WATCH_FUNCTIONS = ("sts2_gpu_errors", "sts2_gpu_picture_stopped", "sts2_gestures_state")
+
+
+def watch_and_gestures(facts: Facts) -> list[str]:
+    """The app exports the GPU watch (native/gpu_watch.mm) and the edge gesture state (native/orientation_guard.mm)."""
+    exported = set(run(["nm", "-g", "-U", "-j", str(facts.app / "FullGame")]).split())
+    return report(*(f"the app does not export {name}" for name in WATCH_FUNCTIONS if "_" + name not in exported))
+
+
+def fmod_file_thread(facts: Facts) -> list[str]:
+    """The FMOD extension in the app carries the file thread fix (tools/patch_fmod_file_thread.py)."""
+    framework = facts.app / "Frameworks/libGodotFmod.ios.template_release.universal.framework"
+    library_file = framework / "libGodotFmod.ios.template_release.universal"
+    if not library_file.is_file():
+        return ["the app has no FMOD extension library"]
+    return report(None if patch_fmod_file_thread.is_patched(library_file.read_bytes()) else "the FMOD file thread is not patched")
+
+
 def size_steps(facts: Facts) -> list[str]:
     with UNSTRIPPED.open("rb") as handle, mmap.mmap(handle.fileno(), 0, prot=mmap.PROT_READ) as unstripped:
         same = loaded_bytes_hash(facts.data) == loaded_bytes_hash(unstripped)
@@ -311,6 +330,8 @@ CHECKS = [
     ("game assembly hook installed at load", game_assembly_hook),
     ("texture encoder linked, its internals hidden", texture_encoder),
     ("voice audio exported, microphone text with QuickMatch", voice_audio),
+    ("FMOD file thread leaves the file's reference count alone", fmod_file_thread),
+    ("GPU watch and edge gestures exported", watch_and_gestures),
     ("library stripped, unused assemblies removed", size_steps),
     ("what the app and the game refer to is present", assemblies_present),
 ]

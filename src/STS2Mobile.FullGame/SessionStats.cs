@@ -16,6 +16,7 @@ public partial class SessionStats : Node
     private const double SampleSeconds = 1;
     private const int Megabyte = 1024 * 1024;
     private ulong _lastFrame, _worstFrame, _lastSample;
+    private bool _toldStopped;
 
     /// <summary>A mark on the same clock as the samples.</summary>
     public static void Mark(string name) => GD.Print($"[stats] {name} ms={Time.GetTicksMsec()}");
@@ -43,8 +44,13 @@ public partial class SessionStats : Node
             + $"orphans={Count(Performance.Monitor.ObjectOrphanNodeCount)} "
             + $"gc0={GC.CollectionCount(0)} gc1={GC.CollectionCount(1)} thermal={DevicePower.ThermalState()} "
             + $"battery={DevicePower.BatteryPercent()} power={DevicePower.BatteryState()} "
-            + $"cpu_s={cpu:F1} energy_j={energy:F1} at={DateTime.Now:HH:mm:ss}");
+            + $"cpu_s={cpu:F1} energy_j={energy:F1} gpu_errors={GpuWatch.Errors()} at={DateTime.Now:HH:mm:ss}");
         _worstFrame = 0;
+        if (!_toldStopped && GpuWatch.PictureStopped())
+        {
+            _toldStopped = true;
+            GD.Print($"[stats] picture_stopped ms={now / 1000} gpu_errors={GpuWatch.Errors()}");
+        }
     }
 
     private static long Count(Performance.Monitor monitor) => (long)Performance.GetMonitor(monitor);

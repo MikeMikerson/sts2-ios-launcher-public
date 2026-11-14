@@ -12,6 +12,7 @@ import subprocess
 import zlib
 from pathlib import Path
 
+import patch_fmod_file_thread
 from hashing import sha256_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +56,9 @@ def stage_native_extensions() -> list[dict]:
     changes = []
     libs = addons / "fmod/libs"
     shutil.copytree(ROOT / "vendor/fmod/2.03.06/gdextension/ios", libs / "ios")
+    # Only the release library ships (ios.release); the debug one is left as it came.
+    for library in sorted((libs / "ios").rglob(patch_fmod_file_thread.LIBRARY)):
+        changes.append({"path": str(library.relative_to(HOST)), **patch_fmod_file_thread.patch_file(library)})
     for library in sorted((libs / "ios").rglob("*.dylib")):
         original = sha256_file(library)
         subprocess.run(["install_name_tool", "-id", f"@rpath/{library.name}", str(library)], check=True)

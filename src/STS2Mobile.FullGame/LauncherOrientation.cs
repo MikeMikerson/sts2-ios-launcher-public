@@ -33,5 +33,6 @@ public static class LauncherOrientation
             size = DisplayServer.WindowGetSize();
         }
         GD.Print($"Orientation: landscape for the game, window {size.X}x{size.Y} after {clock.ElapsedMilliseconds} ms.");
+        if (ScreenOrientation.GestureState() is { } gestures) GD.Print($"Edge gestures: {gestures}.");
     }
 }
