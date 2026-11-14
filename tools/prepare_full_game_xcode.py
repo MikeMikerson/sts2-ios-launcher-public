@@ -292,6 +292,7 @@ def prepare() -> None:
     if "sentry" in text.lower():
         raise ValueError("Sentry dependency in generated full-game project")
     properties["godot_cmdline"] = startup_arguments()
+    properties["LSSupportsGameMode"] = True
     text = use_app_store_launch_packaging(text, properties)
     fill_purpose_strings(properties, VOICE_MOD.is_file())
     adopt_scene_lifecycle(properties)
