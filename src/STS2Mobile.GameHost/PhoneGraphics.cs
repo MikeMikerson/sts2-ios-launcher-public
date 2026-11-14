@@ -36,6 +36,7 @@ public sealed partial class PhoneGraphics : Node
     private bool _gameRunning;
     private bool _focused = true;
     private MegaRichTextLabel? _resolutionLabel;
+    private MegaRichTextLabel? _fillScreenLabel;
 
     public override void _Ready()
     {
@@ -44,6 +45,7 @@ public sealed partial class PhoneGraphics : Node
         {
             _path = ProjectSettings.GlobalizePath(SettingsPath);
             _settings = PhoneGraphicsSettings.Load(_path);
+            SafeAreaCanvas.FillScreen = _settings.FillScreen;
             _appliedFactor = DevicePower.RenderScale();
             GD.Print("Phone graphics: ", _settings.Describe(_appliedFactor));
             GetTree().Root.WindowInput += OnWindowInput;
@@ -139,6 +141,8 @@ public sealed partial class PhoneGraphics : Node
                 () => (int)_settings.Preset, choice => Store(_settings.WithPreset((BatteryPreset)choice)), out _);
             index = AddRow(content, template, divider, index, ResolutionTitle(), () => ResolutionChoices,
                 () => (int)_settings.Resolution, choice => Store(_settings with { Resolution = (RenderResolution)choice }), out _resolutionLabel);
+            index = AddRow(content, template, divider, index, FillScreenTitle(), () => OffOn,
+                () => _settings.FillScreen ? 1 : 0, choice => Store(_settings with { FillScreen = choice == 1 }), out _fillScreenLabel);
             index = AddRow(content, template, divider, index, "Lower FPS When Idle", () => OffOn,
                 () => _settings.LowerIdleFrameRate ? 1 : 0, choice => Store(_settings with { LowerIdleFrameRate = choice == 1 }), out _);
             AddRow(content, template, divider, index, "Cool Down When Hot", () => OffOn,
@@ -191,11 +195,15 @@ public sealed partial class PhoneGraphics : Node
         foreach (PhoneOptionPaginator row in _rows)
             if (IsInstanceValid(row) && row.IsInsideTree()) row.SetFromSettings();
         if (_resolutionLabel != null && IsInstanceValid(_resolutionLabel)) _resolutionLabel.Text = ResolutionTitle();
+        if (_fillScreenLabel != null && IsInstanceValid(_fillScreenLabel)) _fillScreenLabel.Text = FillScreenTitle();
     }
 
     /// <summary>The resolution is chosen before the engine starts, so a new choice needs a restart.</summary>
     private string ResolutionTitle() =>
         Math.Abs(_settings.ResolutionFactor - _appliedFactor) < 0.001 ? "Render Resolution" : "Render Resolution (after restart)";
+
+    private string FillScreenTitle() =>
+        _settings.FillScreen == SafeAreaCanvas.FillScreen ? "Fill Screen" : "Fill Screen (after restart)";
 
     private double Now() => Stopwatch.GetElapsedTime(_origin).TotalSeconds;
 

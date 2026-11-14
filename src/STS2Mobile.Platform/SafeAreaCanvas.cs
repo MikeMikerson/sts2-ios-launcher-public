@@ -21,6 +21,8 @@ public static unsafe class SafeAreaCanvas
     private const int BaseWidth = 1680, BaseHeight = 1080, WidestWidth = 2580, TallestHeight = 1260;
     private const float WidestRatio = 2.3888888f, NarrowestRatio = 1.3333334f;
 
+    public static bool FillScreen { get; set; }
+
     private static readonly delegate* unmanaged<double> SideInsetFunction = (delegate* unmanaged<double>)NativeExports.Find("sts2_screen_side_inset");
 
     /// <summary>
@@ -31,7 +33,7 @@ public static unsafe class SafeAreaCanvas
 
     /// <summary>The canvas for a window of this many pixels: the aspect mode to set, and the canvas size through the out values.</summary>
     public static long Layout(int windowWidth, int windowHeight, out int canvasWidth, out int canvasHeight) =>
-        Choose(windowWidth, windowHeight, SideInset(), out canvasWidth, out canvasHeight);
+        Choose(windowWidth, windowHeight, FillScreen ? 0 : SideInset(), out canvasWidth, out canvasHeight);
 
     /// <summary>
     /// <see cref="Layout"/> for a given side inset. With none it is the game's own rule, unchanged. With one, the canvas has the shape

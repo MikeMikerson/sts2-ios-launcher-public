@@ -53,10 +53,26 @@ public sealed class PhoneGraphicsSettingsTests : IDisposable
     [Fact]
     public void SettingsSurviveSaveAndLoad()
     {
-        var chosen = Defaults.WithPreset(BatteryPreset.Off) with { MsaaCleared = true };
+        var chosen = Defaults.WithPreset(BatteryPreset.Off) with { MsaaCleared = true, FillScreen = true };
         chosen.Save(SettingsFile);
         Assert.Equal(chosen, PhoneGraphicsSettings.Load(SettingsFile));
         Assert.False(File.Exists(SettingsFile + ".partial"));
+    }
+
+    [Fact]
+    public void OlderSettingsKeepTheSafeArea()
+    {
+        File.WriteAllText(SettingsFile, """{"format":1,"resolution":"reduced","msaaCleared":true}""");
+        Assert.True(PhoneGraphicsSettings.Load(SettingsFile) is
+            { Resolution: RenderResolution.Reduced, MsaaCleared: true, FillScreen: false });
+    }
+
+    [Fact]
+    public void BatteryPresetKeepsFillScreen()
+    {
+        var filled = Off with { FillScreen = true };
+        Assert.Equal(BatteryPreset.Off, filled.Preset);
+        Assert.True(filled.WithPreset(BatteryPreset.Maximum).FillScreen);
     }
 
     [Fact]

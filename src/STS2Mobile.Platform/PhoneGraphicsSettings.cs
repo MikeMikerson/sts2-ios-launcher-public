@@ -12,6 +12,8 @@ namespace STS2Mobile.Platform;
 /// </summary>
 public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool LowerIdleFrameRate, bool CoolDownWhenHot, bool MsaaCleared)
 {
+    public bool FillScreen { get; init; }
+
     public const string FileName = "phone-graphics.json";
     private const int Format = 1;
 
@@ -61,7 +63,10 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
             if (!File.Exists(path) || JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root) return Default;
             return new PhoneGraphicsSettings(
                 Enum.TryParse(Text(root, "resolution"), ignoreCase: true, out RenderResolution resolution) ? resolution : RenderResolution.Full,
-                Flag(root, "lowerIdleFrameRate"), Flag(root, "coolDownWhenHot"), Flag(root, "msaaCleared"));
+                Flag(root, "lowerIdleFrameRate"), Flag(root, "coolDownWhenHot"), Flag(root, "msaaCleared"))
+            {
+                FillScreen = Flag(root, "fillScreen"),
+            };
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)
         {
@@ -84,6 +89,7 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
             writer.WriteBoolean("lowerIdleFrameRate", LowerIdleFrameRate);
             writer.WriteBoolean("coolDownWhenHot", CoolDownWhenHot);
             writer.WriteBoolean("msaaCleared", MsaaCleared);
+            writer.WriteBoolean("fillScreen", FillScreen);
             writer.WriteEndObject();
         }
         File.Move(partial, path, overwrite: true);
