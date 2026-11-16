@@ -24,6 +24,9 @@ public static unsafe class SafeAreaCanvas
     private const int BaseWidth = 1680, BaseHeight = 1080, WidestWidth = 2580, TallestHeight = 1260;
     private const float WidestRatio = 2.3888888f, NarrowestRatio = 1.3333334f;
 
+    /// <summary>Opt into the game's full-screen landscape layout instead of safe-area letterboxing.</summary>
+    public static bool FillScreen { get; set; }
+
     private static readonly delegate* unmanaged<double> SideInsetFunction = (delegate* unmanaged<double>)NativeExports.Find("sts2_screen_side_inset");
     private static readonly delegate* unmanaged<double> TopInsetFunction = (delegate* unmanaged<double>)NativeExports.Find("sts2_screen_top_inset");
     private static volatile bool _portrait;
@@ -49,7 +52,7 @@ public static unsafe class SafeAreaCanvas
     public static long Layout(int windowWidth, int windowHeight, out int canvasWidth, out int canvasHeight) =>
         _portrait
             ? ChoosePortrait(windowWidth, windowHeight, out canvasWidth, out canvasHeight)
-            : Choose(windowWidth, windowHeight, SideInset(), out canvasWidth, out canvasHeight);
+            : Choose(windowWidth, windowHeight, FillScreen ? 0 : SideInset(), out canvasWidth, out canvasHeight);
 
     /// <summary>
     /// Portrait canvas: 1080 across, height matched to the phone's tall/narrow pixel ratio so there are no letterbox bars and the
