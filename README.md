@@ -29,7 +29,8 @@ To build it yourself (with no Mac, see [Install without a Mac](#install-without-
 - Xcode 27.2 (other versions are refused), opened once, with your Apple ID added in **Settings > Apple
   Accounts**. A free Apple ID works.
 - An iPhone and its cable, with about 5.5 GB free during setup and 2.5 GB after. Tested on an iPhone 11 Pro;
-  the build allows iOS 15 or later, but other models are untested.
+  the build allows iOS 15 or later, but other models are untested. An iPad works too, so far checked only on
+  the simulator (see [iPad and LiveContainer](#ipad-and-livecontainer)).
 - A Steam account that owns Slay the Spire 2. The game does not need to be on the Mac.
 
 ## Install
@@ -123,12 +124,50 @@ switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud o
 account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
 asking.
 
+## Playing in portrait
+
+The game starts in landscape and plays as it does on a desktop, with a touch as the mouse. To play with the
+iPhone upright, open the game's **Settings > Graphics** and turn on **Portrait Mode**; the game turns at once,
+also in the middle of a run, and turning it off goes back to landscape. **Set Portrait as Default**, shown
+while Portrait Mode is on, starts the game upright the next time.
+
+In portrait every screen is laid out for the narrow screen, with buttons and text sized for a finger:
+
+- Drag a card to play it. Tap or long press a card to read it and its tips.
+- Cards, relics and shop items are taken only after a confirm: tap one, then **Choose** (in the shop, tap it
+  again to buy), so a stray tap takes nothing.
+- A scroll that starts on a card scrolls.
+
+Portrait Mode changes nothing in landscape.
+
+In landscape the game stays inside the screen's safe area by default. **Settings > Graphics > Fill Screen**
+uses the full screen after restarting the app; the notch or rounded corners may cover edge controls.
+This choice is saved independently of Portrait Mode and Battery Saver and does not change the portrait layout.
+
 ## Every 7 days, with a free Apple ID
 
 A free Apple ID's apps stop opening after 7 days. Connect the iPhone and run `./setup.sh --install` again. It
 reinstalls over the old app, so the game, your saves and your sign-in stay. **Do not delete the app from the
 iPhone**: that deletes the game and the saves on it. Saves on the iPhone reach Steam Cloud only when you press
 **Send** under Cloud saves.
+
+## iPad and LiveContainer
+
+The same build installs on an iPad. It has been checked on iPad simulators (iPad Pro 13-inch), not on a real
+iPad, so treat iPad support as untested on hardware:
+
+- The launcher is upright and the game turns to landscape, as on an iPhone, and Portrait Mode works. The game
+  fills the iPad's squarer screen; some menus leave empty space below them.
+- The app takes the whole screen: no Split View, Slide Over or Stage Manager windows.
+- On an iPad, Render Resolution 83% and 67% both draw at half the screen's resolution, since the engine needs
+  a whole-number scale; 100% draws at full resolution.
+
+The app also runs inside [LiveContainer](https://github.com/LiveContainer/LiveContainer), checked with
+LiveContainer built from source on an iPad simulator. Builds before 2026-11-16 hung on a black screen, or took
+no touches on an iPad, after the first **Close the app**; install a newer build. Inside LiveContainer, iPadOS
+can resize the app, so the app cannot turn the screen itself: hold the iPad sideways before starting the game,
+or it shows letterboxed in an upright window. The game, your saves and your sign-in there are kept in
+LiveContainer's own folder for the app, apart from an installed copy.
 
 ## Mods and multiplayer
 

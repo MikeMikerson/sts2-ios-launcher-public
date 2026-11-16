@@ -391,7 +391,8 @@ public partial class Launcher : Control
         SessionStats.Mark("game-start");
         try
         {
-            await LauncherOrientation.UseLandscapeAsync(GetWindow());
+            var graphics = PhoneGraphicsSettings.Load(ProjectSettings.GlobalizePath("user://" + PhoneGraphicsSettings.FileName));
+            await LauncherOrientation.UseGameAsync(GetWindow(), graphics.StartInPortrait);
             await StartEntryAsync();
         }
         catch when (_entry?.GameCreated != true)

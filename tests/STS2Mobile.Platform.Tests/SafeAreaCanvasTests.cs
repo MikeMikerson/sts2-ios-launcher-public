@@ -51,7 +51,64 @@ public class SafeAreaCanvasTests
     public void OffThePhoneThereIsNoInset()
     {
         Assert.Equal(0, SafeAreaCanvas.SideInset());
+        Assert.Equal(0, SafeAreaCanvas.TopInset());
+        Assert.False(SafeAreaCanvas.IsPortrait);
         Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(2532, 1170, out int w, out int h));
         Assert.Equal((1680, 1080), (w, h));
+    }
+
+    [Theory]
+    // Portrait iPhone 18 Pro (393 x 852 pt at 3x and 2x) and mid-rotation landscape window before iOS finishes turning.
+    [InlineData(1179, 2556, 1080, 2341)]
+    [InlineData(2556, 1179, 1080, 2341)]
+    [InlineData(786, 1704, 1080, 2341)]
+    [InlineData(1320, 2868, 1080, 2347)]
+    public void PortraitCanvasMatchesPhoneShapeAcrossResolutionsAndRotation(int width, int height, int expectedWidth, int expectedHeight)
+    {
+        Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.ChoosePortrait(width, height, out int w, out int h));
+        Assert.Equal((expectedWidth, expectedHeight), (w, h));
+    }
+
+    [Fact]
+    public void FillScreenKeepsPortraitLayoutAndSurvivesSwitchingBack()
+    {
+        try
+        {
+            SafeAreaCanvas.FillScreen = true;
+            SafeAreaCanvas.SetPortrait(true);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(1179, 2556, out int pw, out int ph));
+            Assert.Equal((1080, 2341), (pw, ph));
+
+            SafeAreaCanvas.SetPortrait(false);
+            Assert.True(SafeAreaCanvas.FillScreen);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(2556, 1179, out int lw, out int lh));
+            Assert.Equal((1680, 1080), (lw, lh));
+        }
+        finally
+        {
+            SafeAreaCanvas.FillScreen = false;
+            SafeAreaCanvas.SetPortrait(false);
+        }
+    }
+
+    [Fact]
+    public void SwitchingPortraitModeUpdatesAndRestoresLayout()
+    {
+        try
+        {
+            SafeAreaCanvas.SetPortrait(true);
+            Assert.True(SafeAreaCanvas.IsPortrait);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(1179, 2556, out int pw, out int ph));
+            Assert.Equal((1080, 2341), (pw, ph));
+
+            SafeAreaCanvas.SetPortrait(false);
+            Assert.False(SafeAreaCanvas.IsPortrait);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(2556, 1179, out int lw, out int lh));
+            Assert.Equal((1680, 1080), (lw, lh));
+        }
+        finally
+        {
+            SafeAreaCanvas.SetPortrait(false);
+        }
     }
 }

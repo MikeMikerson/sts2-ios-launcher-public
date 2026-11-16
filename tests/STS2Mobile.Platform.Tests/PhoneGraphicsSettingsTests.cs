@@ -15,7 +15,17 @@ public sealed class PhoneGraphicsSettingsTests : IDisposable
     [Fact]
     public void DefaultsAreTheMaximumPreset()
     {
-        Assert.True(Defaults is { Resolution: RenderResolution.Low, LowerIdleFrameRate: true, CoolDownWhenHot: true, MsaaCleared: false, Preset: BatteryPreset.Maximum });
+        Assert.True(Defaults is
+        {
+            Resolution: RenderResolution.Low,
+            LowerIdleFrameRate: true,
+            CoolDownWhenHot: true,
+            MsaaCleared: false,
+            PortraitMode: false,
+            PortraitDefault: false,
+            StartInPortrait: false,
+            Preset: BatteryPreset.Maximum,
+        });
         Assert.Equal(2.0 / 3.0, Defaults.ResolutionFactor, 1e-9);
     }
 
@@ -53,7 +63,8 @@ public sealed class PhoneGraphicsSettingsTests : IDisposable
     [Fact]
     public void SettingsSurviveSaveAndLoad()
     {
-        var chosen = Defaults.WithPreset(BatteryPreset.Off) with { MsaaCleared = true, FillScreen = true };
+        var chosen = Defaults.WithPreset(BatteryPreset.Off).WithPortraitMode(true).WithPortraitDefault(true)
+            with { MsaaCleared = true, FillScreen = true };
         chosen.Save(SettingsFile);
         Assert.Equal(chosen, PhoneGraphicsSettings.Load(SettingsFile));
         Assert.False(File.Exists(SettingsFile + ".partial"));
@@ -94,6 +105,31 @@ public sealed class PhoneGraphicsSettingsTests : IDisposable
     public void WronglyTypedValuesFallBackOneByOne()
     {
         File.WriteAllText(SettingsFile, "{\"resolution\":\"reduced\",\"coolDownWhenHot\":\"yes\"}");
-        Assert.True(PhoneGraphicsSettings.Load(SettingsFile) is { Resolution: RenderResolution.Reduced, CoolDownWhenHot: false });
+        Assert.True(PhoneGraphicsSettings.Load(SettingsFile) is { Resolution: RenderResolution.Reduced, CoolDownWhenHot: false, PortraitMode: false, PortraitDefault: false });
+    }
+
+    [Fact]
+    public void PortraitSettingsRoundTripAndKeepBatteryPresetsIndependent()
+    {
+        var portraitOnly = Defaults.WithPortraitMode(true);
+        Assert.True(portraitOnly is { PortraitMode: true, PortraitDefault: false, StartInPortrait: false, Preset: BatteryPreset.Maximum });
+        portraitOnly.Save(SettingsFile);
+        Assert.Equal(portraitOnly, PhoneGraphicsSettings.Load(SettingsFile));
+
+        var portraitAtLaunch = portraitOnly.WithPortraitDefault(true);
+        Assert.True(portraitAtLaunch is { PortraitMode: true, PortraitDefault: true, StartInPortrait: true, Preset: BatteryPreset.Maximum });
+        Assert.True(portraitAtLaunch.WithPreset(BatteryPreset.Balanced) is { PortraitMode: true, PortraitDefault: true, Preset: BatteryPreset.Balanced });
+        portraitAtLaunch.Save(SettingsFile);
+        Assert.Equal(portraitAtLaunch, PhoneGraphicsSettings.Load(SettingsFile));
+
+        var backToLandscape = portraitAtLaunch.WithPortraitMode(false);
+        Assert.True(backToLandscape is { PortraitMode: false, PortraitDefault: false, StartInPortrait: false });
+    }
+
+    [Fact]
+    public void PortraitDefaultIsClearedOnLoadWhenPortraitModeIsOff()
+    {
+        File.WriteAllText(SettingsFile, "{\"resolution\":\"low\",\"portraitMode\":false,\"portraitDefault\":true}");
+        Assert.True(PhoneGraphicsSettings.Load(SettingsFile) is { PortraitMode: false, PortraitDefault: false, StartInPortrait: false });
     }
 }

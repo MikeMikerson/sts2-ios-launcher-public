@@ -7,7 +7,8 @@
 // Render resolution: the engine sizes its drawing surface, maps touches and computes the safe area
 // from UIScreen.scale (Godot 4.5.1 drivers/apple_embedded and platform/ios). Reporting a smaller
 // scale to the app before the engine starts therefore makes it draw fewer pixels with every one of
-// those staying consistent, and iOS scales the picture up to the screen. The choice is read from
+// those staying consistent, as long as the scale is a whole number (see STS2ScreenScale), and iOS
+// scales the picture up to the screen. The choice is read from
 // Documents/phone-graphics.json (written by PhoneGraphicsSettings.cs, key "renderScale") once,
 // before main, so a change takes effect at the next launch. Without the file nothing is changed.
 #import <UIKit/UIKit.h>
@@ -34,9 +35,14 @@ static CGFloat STS2ReadRenderScale(void) {
 	return (scale >= 0.5 && scale < 1.0) ? scale : 1.0;
 }
 
+// A whole number, never below 1. The engine sizes its window and drawing surface as an integer size times this scale, and
+// Godot's Vector2i multiplies by an integer, so a fraction is cut off there while touches are mapped with the full one. On a
+// 3x iPhone 67% gave 2.0 and worked by luck; on a 2x iPad it gave 1.33, drawn at 1, and every touch landed a third too far
+// down and right. Rounding down keeps the choice a lower resolution: on a 2x iPad 67% and 83% both draw at 1, and
+// on a 3x iPhone 83% draws at 2, like 67%.
 static CGFloat STS2ScreenScale(id self, SEL _cmd) {
 	CGFloat scale = ((CGFloat (*)(id, SEL))gScreenScale)(self, _cmd);
-	return scale * gRenderScale;
+	return MAX(1.0, floor(scale * gRenderScale + 0.01));
 }
 
 extern "C" __attribute__((visibility("default"))) int sts2_power_thermal_state(void) {
@@ -95,7 +101,12 @@ __attribute__((constructor)) static void STS2InstallRenderScale(void) {
 		if (scale >= 1.0) {
 			return;
 		}
-		Method method = class_getInstanceMethod([UIScreen class], @selector(scale));
+		// Looked up by name: a message to UIScreen would run +[UIScreen initialize] here, while the image loads. Under
+		// LiveContainer the app is loaded by dlopen into a process whose UIKit is already starting, and that initialize waits
+		// for UIKit's configuration loader, so the launch hung on a black screen whenever a lower resolution was set.
+		// Neither class_getInstanceMethod nor method_setImplementation sends +initialize.
+		Class screen = objc_getClass("UIScreen");
+		Method method = screen ? class_getInstanceMethod(screen, @selector(scale)) : NULL;
 		if (!method) {
 			return;
 		}

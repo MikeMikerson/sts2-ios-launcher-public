@@ -17,13 +17,24 @@ public static unsafe class SafeAreaCanvas
     // Godot's Window.ContentScaleAspectEnum, whose underlying type is long.
     public const long Keep = 1, KeepWidth = 2, KeepHeight = 3, Expand = 4;
 
+    // Portrait mode keeps a 1080-unit width (matching the physical point scale of 1080-tall landscape) and stretches height to the phone.
+    public const int PortraitWidth = 1080, MinPortraitHeight = 1920, MaxPortraitHeight = 2600;
+
     // The game's own canvas sizes for its automatic aspect ratio (NGlobalUi.OnWindowChange).
     private const int BaseWidth = 1680, BaseHeight = 1080, WidestWidth = 2580, TallestHeight = 1260;
     private const float WidestRatio = 2.3888888f, NarrowestRatio = 1.3333334f;
 
+    /// <summary>Opt into the game's full-screen landscape layout instead of safe-area letterboxing.</summary>
     public static bool FillScreen { get; set; }
 
     private static readonly delegate* unmanaged<double> SideInsetFunction = (delegate* unmanaged<double>)NativeExports.Find("sts2_screen_side_inset");
+    private static readonly delegate* unmanaged<double> TopInsetFunction = (delegate* unmanaged<double>)NativeExports.Find("sts2_screen_top_inset");
+    private static volatile bool _portrait;
+
+    /// <summary>Whether the game is currently using its portrait canvas rather than its default landscape canvas.</summary>
+    public static bool IsPortrait => _portrait;
+
+    public static void SetPortrait(bool portrait) => _portrait = portrait;
 
     /// <summary>
     /// The larger of the left and right safe-area insets as a fraction of the screen's width, from <c>native/orientation_guard.mm</c>.
@@ -31,9 +42,35 @@ public static unsafe class SafeAreaCanvas
     /// </summary>
     public static double SideInset() => SideInsetFunction != null ? SideInsetFunction() : 0;
 
+    /// <summary>
+    /// The top safe-area inset in portrait as a fraction of the screen's height, from <c>native/orientation_guard.mm</c>.
+    /// 0 off the phone, in landscape, and on a screen with no top inset.
+    /// </summary>
+    public static double TopInset() => TopInsetFunction != null ? TopInsetFunction() : 0;
+
     /// <summary>The canvas for a window of this many pixels: the aspect mode to set, and the canvas size through the out values.</summary>
     public static long Layout(int windowWidth, int windowHeight, out int canvasWidth, out int canvasHeight) =>
-        Choose(windowWidth, windowHeight, FillScreen ? 0 : SideInset(), out canvasWidth, out canvasHeight);
+        _portrait
+            ? ChoosePortrait(windowWidth, windowHeight, out canvasWidth, out canvasHeight)
+            : Choose(windowWidth, windowHeight, FillScreen ? 0 : SideInset(), out canvasWidth, out canvasHeight);
+
+    /// <summary>
+    /// Portrait canvas: 1080 across, height matched to the phone's tall/narrow pixel ratio so there are no letterbox bars and the
+    /// top bar's slate cap can extend behind the Dynamic Island. Works identically before and after iOS finishes rotating the window.
+    /// </summary>
+    public static long ChoosePortrait(int windowWidth, int windowHeight, out int canvasWidth, out int canvasHeight)
+    {
+        canvasWidth = PortraitWidth;
+        if (windowWidth <= 0 || windowHeight <= 0)
+        {
+            canvasHeight = 2340;
+            return Expand;
+        }
+        int narrow = Math.Min(windowWidth, windowHeight);
+        int tall = Math.Max(windowWidth, windowHeight);
+        canvasHeight = Math.Clamp((int)Math.Round((double)PortraitWidth * tall / narrow), MinPortraitHeight, MaxPortraitHeight);
+        return Expand;
+    }
 
     /// <summary>
     /// <see cref="Layout"/> for a given side inset. With none it is the game's own rule, unchanged. With one, the canvas has the shape

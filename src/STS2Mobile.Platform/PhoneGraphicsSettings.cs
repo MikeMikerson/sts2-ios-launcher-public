@@ -10,7 +10,13 @@ namespace STS2Mobile.Platform;
 /// app's native code before the engine starts (<c>native/power_state.mm</c> reads
 /// <c>renderScale</c>), so a change to it takes effect at the next launch.
 /// </summary>
-public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool LowerIdleFrameRate, bool CoolDownWhenHot, bool MsaaCleared)
+public sealed record PhoneGraphicsSettings(
+    RenderResolution Resolution,
+    bool LowerIdleFrameRate,
+    bool CoolDownWhenHot,
+    bool MsaaCleared,
+    bool PortraitMode = false,
+    bool PortraitDefault = false)
 {
     public bool FillScreen { get; init; }
 
@@ -18,11 +24,22 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
     private const int Format = 1;
 
     /// <summary>
-    /// A new install's choices, the Maximum preset: Low resolution, 30 fps when idle and cooling down when hot.
-    /// The first launch still draws at full resolution, since the file is written once the
-    /// game has started and the native code reads it before the next launch's engine starts.
+    /// A new install's choices, the Maximum preset in landscape: Low resolution, 30 fps when idle, cooling down when hot,
+    /// and Portrait Mode off. The first launch still draws at full resolution, since the file is
+    /// written once the game has started and the native code reads it before the next launch's engine starts.
     /// </summary>
-    public static readonly PhoneGraphicsSettings Default = new(RenderResolution.Low, true, true, false);
+    public static readonly PhoneGraphicsSettings Default = new(RenderResolution.Low, true, true, false, false, false);
+
+    /// <summary>True only when Portrait Mode is on and the player chose to enter portrait at game launch.</summary>
+    public bool StartInPortrait => PortraitMode && PortraitDefault;
+
+    /// <summary>Turns Portrait Mode on or off; turning it off also clears the launch-in-portrait default.</summary>
+    public PhoneGraphicsSettings WithPortraitMode(bool enabled) =>
+        enabled ? this with { PortraitMode = true } : this with { PortraitMode = false, PortraitDefault = false };
+
+    /// <summary>Sets whether the game launches directly into portrait while Portrait Mode is on.</summary>
+    public PhoneGraphicsSettings WithPortraitDefault(bool enabled) =>
+        PortraitMode ? this with { PortraitDefault = enabled } : this with { PortraitDefault = false };
 
     /// <summary>Fraction of the screen's resolution drawn: 3x, 2.5x or 2x pixels per point on a 3x screen.</summary>
     public double ResolutionFactor => FactorOf(Resolution);
@@ -61,9 +78,14 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
         try
         {
             if (!File.Exists(path) || JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root) return Default;
+            bool portraitMode = Flag(root, "portraitMode");
             return new PhoneGraphicsSettings(
                 Enum.TryParse(Text(root, "resolution"), ignoreCase: true, out RenderResolution resolution) ? resolution : RenderResolution.Full,
-                Flag(root, "lowerIdleFrameRate"), Flag(root, "coolDownWhenHot"), Flag(root, "msaaCleared"))
+                Flag(root, "lowerIdleFrameRate"),
+                Flag(root, "coolDownWhenHot"),
+                Flag(root, "msaaCleared"),
+                portraitMode,
+                portraitMode && Flag(root, "portraitDefault"))
             {
                 FillScreen = Flag(root, "fillScreen"),
             };
@@ -90,6 +112,8 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
             writer.WriteBoolean("coolDownWhenHot", CoolDownWhenHot);
             writer.WriteBoolean("msaaCleared", MsaaCleared);
             writer.WriteBoolean("fillScreen", FillScreen);
+            writer.WriteBoolean("portraitMode", PortraitMode);
+            writer.WriteBoolean("portraitDefault", PortraitMode && PortraitDefault);
             writer.WriteEndObject();
         }
         File.Move(partial, path, overwrite: true);
@@ -97,7 +121,7 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
 
     /// <summary>A one-line summary for the log.</summary>
     public string Describe(double appliedFactor) => string.Create(CultureInfo.InvariantCulture,
-        $"{Preset.ToString().ToLowerInvariant()} resolution={Resolution.ToString().ToLowerInvariant()} applied={appliedFactor:0.###} idle30={LowerIdleFrameRate} cool={CoolDownWhenHot}");
+        $"{Preset.ToString().ToLowerInvariant()} resolution={Resolution.ToString().ToLowerInvariant()} applied={appliedFactor:0.###} idle30={LowerIdleFrameRate} cool={CoolDownWhenHot} portrait={PortraitMode} portraitDefault={PortraitMode && PortraitDefault}");
 
     private bool Matches(PhoneGraphicsSettings other) =>
         Resolution == other.Resolution && LowerIdleFrameRate == other.LowerIdleFrameRate && CoolDownWhenHot == other.CoolDownWhenHot;

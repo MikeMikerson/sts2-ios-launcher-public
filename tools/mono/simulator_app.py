@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import plistlib
 import shutil
 import struct
@@ -26,7 +27,9 @@ ROOT = HERE.parents[1]
 DEVICE_APP = ROOT / "analysis/full-game-mono/FullGame.app"
 APP = ROOT / "analysis/full-game-simulator/FullGame.app"
 GAME_FILES = ROOT / "analysis/game-files"
-DEVICE_NAME = "iPhone 18 Pro"
+# The iPhone 11 Pro simulator comes first (a small, common screen); the iPhone 18 Pro is the fallback.
+# STS2_SIMULATOR=<name> picks another one.
+DEVICE_NAMES = (os.environ["STS2_SIMULATOR"],) if os.environ.get("STS2_SIMULATOR") else ("iPhone 11 Pro", "iPhone 18 Pro")
 MINIMUM_OS, SDK_VERSION = "15.0", "27.0"
 SHIM_SOURCE = HERE / "simulator_metal_shim.m"
 SHIM_NAME = "libsts2_simulator_metal.dylib"
@@ -224,25 +227,26 @@ def simctl(*arguments: str) -> str:
     return subprocess.run(["xcrun", "simctl", *arguments], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def find_device() -> str:
-    """The named simulator on the newest runtime that has it."""
+def find_device() -> tuple[str, str]:
+    """The first simulator of DEVICE_NAMES that exists, on the newest runtime that has it: its UDID and name."""
     runtimes = json.loads(simctl("list", "devices", "available", "--json"))["devices"]
-    for runtime in sorted(runtimes, reverse=True):
-        for device in runtimes[runtime]:
-            if device["name"] == DEVICE_NAME:
-                return device["udid"]
-    raise SimulatorError(f"No {DEVICE_NAME} simulator. Add one in Device Hub.")
+    for name in DEVICE_NAMES:
+        for runtime in sorted(runtimes, reverse=True):
+            for device in runtimes[runtime]:
+                if device["name"] == name:
+                    return device["udid"], name
+    raise SimulatorError(f"No {' or '.join(DEVICE_NAMES)} simulator. Add one in Device Hub.")
 
 
 def bundle_id() -> str:
     return plistlib.loads((APP / "Info.plist").read_bytes())["CFBundleIdentifier"]
 
 
-def install(device: str) -> None:
+def install(device: str, name: str) -> None:
     subprocess.run(["xcrun", "simctl", "boot", device], capture_output=True)  # fails harmlessly when it is already booted
     simctl("bootstatus", device, "-b")
     simctl("install", device, str(APP))
-    print(f"Installed on {DEVICE_NAME} ({device})", flush=True)
+    print(f"Installed on {name} ({device})", flush=True)
 
 
 def copy_game_files(device: str) -> None:
@@ -267,13 +271,13 @@ def main() -> None:
     if options.print_target:
         if not (APP / "Info.plist").is_file():
             raise SimulatorError("No simulator app. Run scripts/simulator.sh first.")
-        print(find_device(), bundle_id())
+        print(find_device()[0], bundle_id())
         return
     make_app()
     if options.no_install:
         return
-    device = find_device()
-    install(device)
+    device, name = find_device()
+    install(device, name)
     if options.game_files:
         copy_game_files(device)
 

@@ -65,6 +65,8 @@ public sealed partial class PhoneOptionPaginator : NPaginator, IResettableSettin
         SetFromSettings();
     }
 
+    internal void SelectForProof(int index) => OnIndexChanged(index);
+
     private static void Collect(Node node, Node owner, List<Node> owned)
     {
         foreach (Node child in node.GetChildren())

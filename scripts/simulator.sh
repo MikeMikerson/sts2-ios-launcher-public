@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Make the simulator app from the built device app and install it on the iPhone 18 Pro simulator.
+# Make the simulator app from the built device app and install it on the iPhone 11 Pro simulator (the iPhone 18 Pro when there
+# is none; STS2_SIMULATOR=<name> picks another).
 # See tools/mono/simulator_app.py. Output: analysis/full-game-simulator/FullGame.app
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"

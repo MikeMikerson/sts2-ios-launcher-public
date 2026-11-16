@@ -10,9 +10,11 @@
 #import <objc/runtime.h>
 
 static NSString *const kEngineDelegateClass = @"GDTApplicationDelegate";
+static NSString *const kEngineViewControllerClass = @"GDTViewController";
 
-// The launcher comes first, so the app starts in portrait.
+// The launcher comes first, so the app starts in portrait with iOS edge gestures left alone.
 static UIInterfaceOrientationMask gMask = UIInterfaceOrientationMaskPortrait;
+static BOOL gDeferEdges = NO;
 
 static UIInterfaceOrientationMask STS2SupportedOrientations(id self, SEL _cmd, UIApplication *application, UIWindow *window) {
 	return gMask;
@@ -24,6 +26,32 @@ static BOOL STS2SceneIsTheWayAsked(UIWindowScene *scene) {
 		return UIInterfaceOrientationIsLandscape(scene.interfaceOrientation) && size.width >= size.height;
 	}
 	return UIInterfaceOrientationIsPortrait(scene.interfaceOrientation) && size.height >= size.width;
+}
+
+// Cards are dragged up from the bottom edge, which is also the iOS gesture for leaving an app. While the game is up (in
+// landscape or in portrait), every edge is held back: a first swipe goes to the game and only a second one leaves. The engine
+// answers this from a project setting, but a single swipe still left the game on the phone, so the answer is given here and iOS
+// is asked to read it again whenever it may have read the old one. The launcher leaves the gestures to iOS.
+static UIRectEdge STS2DeferredEdges(id self, SEL _cmd) {
+	return gDeferEdges ? UIRectEdgeAll : UIRectEdgeNone;
+}
+
+// The home indicator stays visible: with it hidden, iOS does not hold the bottom edge back.
+static BOOL STS2HidesHomeIndicator(id self, SEL _cmd) {
+	return NO;
+}
+
+static void STS2RefreshSystemGestures(void) {
+	for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+		if (![scene isKindOfClass:UIWindowScene.class]) {
+			continue;
+		}
+		for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+			UIViewController *controller = window.rootViewController;
+			[controller setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
+			[controller setNeedsUpdateOfHomeIndicatorAutoHidden];
+		}
+	}
 }
 
 #pragma clang diagnostic push
@@ -58,10 +86,42 @@ static void STS2KeepOrientation(void) {
 }
 #pragma clang diagnostic pop
 
-// 1 for landscape (the game), 0 for portrait (the launcher). Takes effect at once, and is kept from then on.
+// 1 for landscape, 0 for portrait. Takes effect at once, and is kept from then on.
 extern "C" __attribute__((visibility("default"))) void sts2_orientation_set(int landscape) {
 	gMask = landscape ? UIInterfaceOrientationMaskLandscape : UIInterfaceOrientationMaskPortrait;
 	STS2KeepOrientation();
+	STS2RefreshSystemGestures();
+}
+
+// 1 while the game is running (so bottom-edge card drags defer the home gesture in both orientations), 0 in the launcher.
+extern "C" __attribute__((visibility("default"))) void sts2_defer_edges_set(int defer) {
+	gDeferEdges = defer != 0;
+	STS2RefreshSystemGestures();
+}
+
+// What iOS is told about the edge gestures, for the game's log: the key window's root controller, the edges it holds back
+// (15 is all four) and whether it hides the home indicator. Called on the main thread; the text lasts until the next call.
+extern "C" __attribute__((visibility("default"))) const char *sts2_gestures_state(void) {
+	static char text[160];
+	UIViewController *controller = nil;
+	for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+		if (![scene isKindOfClass:UIWindowScene.class]) {
+			continue;
+		}
+		for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+			if (window.isKeyWindow) {
+				controller = window.rootViewController;
+			}
+		}
+	}
+	if (!controller) {
+		snprintf(text, sizeof text, "no key window");
+		return text;
+	}
+	snprintf(text, sizeof text, "controller %s, deferred edges %lu, home indicator hidden %d",
+			 class_getName(object_getClass(controller)), (unsigned long)controller.preferredScreenEdgesDeferringSystemGestures,
+			 (int)controller.prefersHomeIndicatorAutoHidden);
+	return text;
 }
 
 // The game's side margin in landscape (STS2Mobile.Platform/SafeAreaCanvas.cs): the larger of the key window's left and right
@@ -85,8 +145,28 @@ extern "C" __attribute__((visibility("default"))) double sts2_screen_side_inset(
 	return 0;
 }
 
+// The game's top safe-area inset in portrait (STS2Mobile.Platform/SafeAreaCanvas.cs), as a fraction of the key window's height,
+// so the portrait top bar sits below the notch or Dynamic Island. 0 in landscape, before there is a window, and with no inset.
+extern "C" __attribute__((visibility("default"))) double sts2_screen_top_inset(void) {
+	for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+		if (![scene isKindOfClass:UIWindowScene.class]) {
+			continue;
+		}
+		for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+			CGSize size = window.bounds.size;
+			if (!window.isKeyWindow || size.height <= size.width) {
+				continue;
+			}
+			return window.safeAreaInsets.top / size.height;
+		}
+	}
+	return 0;
+}
+
 // Holding the functions here keeps the linker from removing them: nothing in the app calls them directly, the managed side finds them by name.
-__attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&sts2_orientation_set, (void *)&sts2_screen_side_inset};
+__attribute__((used)) static void *volatile gOrientationExports[] = {
+	(void *)&sts2_orientation_set, (void *)&sts2_defer_edges_set, (void *)&sts2_screen_side_inset,
+	(void *)&sts2_screen_top_inset, (void *)&sts2_gestures_state};
 
 @interface STS2OrientationGuard : NSObject
 @end
@@ -100,6 +180,12 @@ __attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&st
 		// Type encoding of -application:supportedInterfaceOrientationsForWindow: (returns NSUInteger).
 		class_addMethod(delegate, @selector(application:supportedInterfaceOrientationsForWindow:), (IMP)STS2SupportedOrientations, "Q@:@@");
 	}
+	Class controller = NSClassFromString(kEngineViewControllerClass);
+	if (controller) {
+		// Replaces the engine's own answers (or adds them if it has none). Both return NSUInteger / BOOL.
+		class_replaceMethod(controller, @selector(preferredScreenEdgesDeferringSystemGestures), (IMP)STS2DeferredEdges, "Q@:");
+		class_replaceMethod(controller, @selector(prefersHomeIndicatorAutoHidden), (IMP)STS2HidesHomeIndicator, "B@:");
+	}
 	NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
 	for (NSNotificationName name in @[ UIApplicationDidFinishLaunchingNotification, UIApplicationDidBecomeActiveNotification,
 				 UIApplicationWillResignActiveNotification, UIDeviceOrientationDidChangeNotification ]) {
@@ -108,6 +194,7 @@ __attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&st
 							 queue:NSOperationQueue.mainQueue
 						usingBlock:^(NSNotification *notification) {
 							STS2KeepOrientation();
+							STS2RefreshSystemGestures();
 						}];
 	}
 	// A scene can also be resized with no notification the app sees, so look once a second as well.
