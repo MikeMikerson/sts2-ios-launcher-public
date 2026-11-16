@@ -44,8 +44,16 @@ public sealed partial class GameEntry : Node, IGameEntry
         _game = game;
         _graphics.GameStarted();
         StartAutomaticPlay();
+        if (OS.GetEnvironment("STS2_PORTRAIT_PROOF").Length > 0)
+            _ = RunPortraitProofAfterLauncherHidesAsync(game);
         string multiplayer = OS.GetEnvironment("STS2_OPEN_MULTIPLAYER");
         if (multiplayer is "1" or "quickmatch") await ShowMultiplayerMenuAsync(game, multiplayer == "quickmatch");
+    }
+
+    private async Task RunPortraitProofAfterLauncherHidesAsync(NGame game)
+    {
+        for (int frame = 0; frame < 3; frame++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        await PortraitProof.RunIfRequestedAsync(GetTree(), game);
     }
 
     /// <summary>

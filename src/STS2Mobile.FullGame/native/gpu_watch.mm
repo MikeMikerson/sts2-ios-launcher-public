@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 extern "C" void sts2_overlay_show(const char *steps, const char *title, const char *status, float fraction, const char *button);
+extern "C" int sts2_overlay_shown(void);
 
 static const double STS2StoppedAfterSeconds = 3.0;
 static const int STS2StallSeconds = 5;
@@ -92,6 +93,12 @@ static void STS2OpenLogs(void) {
 
 static void STS2ShowStopped(void) {
 	dispatch_async(dispatch_get_main_queue(), ^{
+		// During setup the warmup's own screen is up: it carries on through a stopped picture and ends in its own Close the
+		// app, so it is left as it is. Taking it over cut a warmup short on the phone (2026-11-14).
+		if (sts2_overlay_shown()) {
+			STS2WatchLine(@"Picture stopped during setup: its screen is left as it is");
+			return;
+		}
 		sts2_overlay_show("", "The picture stopped",
 						  "The iPhone's graphics stopped taking the game's drawing, so the screen cannot change any more. The run "
 						  "carries on from its last save when the app is opened again.",

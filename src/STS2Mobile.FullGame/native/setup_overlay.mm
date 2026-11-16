@@ -219,8 +219,14 @@ extern "C" __attribute__((visibility("default"))) void sts2_overlay_press(void) 
 	[gOverlay.button sendActionsForControlEvents:UIControlEventTouchUpInside];
 }
 
+// 1 while the screen is up. native/gpu_watch.mm asks before showing "The picture stopped", so it never takes over the
+// setup screen, whose warmup carries on through a stopped picture and has its own way out. Main thread only.
+extern "C" __attribute__((visibility("default"))) int sts2_overlay_shown(void) {
+	return gOverlay != nil;
+}
+
 // Holding the functions here keeps the linker from removing them: nothing in the app calls them
 // directly, the managed host finds them by name.
 __attribute__((used)) static void *volatile gOverlayExports[] = {
-	(void *)&sts2_overlay_show, (void *)&sts2_overlay_press
+	(void *)&sts2_overlay_show, (void *)&sts2_overlay_press, (void *)&sts2_overlay_shown
 };

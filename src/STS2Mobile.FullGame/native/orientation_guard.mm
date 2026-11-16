@@ -12,8 +12,9 @@
 static NSString *const kEngineDelegateClass = @"GDTApplicationDelegate";
 static NSString *const kEngineViewControllerClass = @"GDTViewController";
 
-// The launcher comes first, so the app starts in portrait.
+// The launcher comes first, so the app starts in portrait with iOS edge gestures left alone.
 static UIInterfaceOrientationMask gMask = UIInterfaceOrientationMaskPortrait;
+static BOOL gDeferEdges = NO;
 
 static UIInterfaceOrientationMask STS2SupportedOrientations(id self, SEL _cmd, UIApplication *application, UIWindow *window) {
 	return gMask;
@@ -27,12 +28,12 @@ static BOOL STS2SceneIsTheWayAsked(UIWindowScene *scene) {
 	return UIInterfaceOrientationIsPortrait(scene.interfaceOrientation) && size.height >= size.width;
 }
 
-// Cards are dragged up from the bottom edge, which is also the iOS gesture for leaving an app. While the game is up, every
-// edge is held back: a first swipe goes to the game and only a second one leaves. The engine answers this from a project
-// setting, but a single swipe still left the game on the phone, so the answer is given here and iOS is asked to read it
-// again whenever it may have read the old one. The launcher, in portrait, leaves the gestures to iOS.
+// Cards are dragged up from the bottom edge, which is also the iOS gesture for leaving an app. While the game is up (in
+// landscape or in portrait), every edge is held back: a first swipe goes to the game and only a second one leaves. The engine
+// answers this from a project setting, but a single swipe still left the game on the phone, so the answer is given here and iOS
+// is asked to read it again whenever it may have read the old one. The launcher leaves the gestures to iOS.
 static UIRectEdge STS2DeferredEdges(id self, SEL _cmd) {
-	return gMask == UIInterfaceOrientationMaskLandscape ? UIRectEdgeAll : UIRectEdgeNone;
+	return gDeferEdges ? UIRectEdgeAll : UIRectEdgeNone;
 }
 
 // The home indicator stays visible: with it hidden, iOS does not hold the bottom edge back.
@@ -85,10 +86,16 @@ static void STS2KeepOrientation(void) {
 }
 #pragma clang diagnostic pop
 
-// 1 for landscape (the game), 0 for portrait (the launcher). Takes effect at once, and is kept from then on.
+// 1 for landscape, 0 for portrait. Takes effect at once, and is kept from then on.
 extern "C" __attribute__((visibility("default"))) void sts2_orientation_set(int landscape) {
 	gMask = landscape ? UIInterfaceOrientationMaskLandscape : UIInterfaceOrientationMaskPortrait;
 	STS2KeepOrientation();
+	STS2RefreshSystemGestures();
+}
+
+// 1 while the game is running (so bottom-edge card drags defer the home gesture in both orientations), 0 in the launcher.
+extern "C" __attribute__((visibility("default"))) void sts2_defer_edges_set(int defer) {
+	gDeferEdges = defer != 0;
 	STS2RefreshSystemGestures();
 }
 
@@ -138,9 +145,28 @@ extern "C" __attribute__((visibility("default"))) double sts2_screen_side_inset(
 	return 0;
 }
 
+// The game's top safe-area inset in portrait (STS2Mobile.Platform/SafeAreaCanvas.cs), as a fraction of the key window's height,
+// so the portrait top bar sits below the notch or Dynamic Island. 0 in landscape, before there is a window, and with no inset.
+extern "C" __attribute__((visibility("default"))) double sts2_screen_top_inset(void) {
+	for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+		if (![scene isKindOfClass:UIWindowScene.class]) {
+			continue;
+		}
+		for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+			CGSize size = window.bounds.size;
+			if (!window.isKeyWindow || size.height <= size.width) {
+				continue;
+			}
+			return window.safeAreaInsets.top / size.height;
+		}
+	}
+	return 0;
+}
+
 // Holding the functions here keeps the linker from removing them: nothing in the app calls them directly, the managed side finds them by name.
-__attribute__((used)) static void *volatile gOrientationExports[] = {(void *)&sts2_orientation_set, (void *)&sts2_screen_side_inset,
-																	  (void *)&sts2_gestures_state};
+__attribute__((used)) static void *volatile gOrientationExports[] = {
+	(void *)&sts2_orientation_set, (void *)&sts2_defer_edges_set, (void *)&sts2_screen_side_inset,
+	(void *)&sts2_screen_top_inset, (void *)&sts2_gestures_state};
 
 @interface STS2OrientationGuard : NSObject
 @end

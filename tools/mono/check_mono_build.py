@@ -265,7 +265,10 @@ def voice_audio(facts: Facts) -> list[str]:
     )
 
 
-WATCH_FUNCTIONS = ("sts2_gpu_errors", "sts2_gpu_picture_stopped", "sts2_gestures_state")
+WATCH_FUNCTIONS = (
+    "sts2_gpu_errors", "sts2_gpu_picture_stopped", "sts2_gestures_state", "sts2_overlay_shown",
+    "sts2_orientation_set", "sts2_defer_edges_set", "sts2_screen_side_inset", "sts2_screen_top_inset",
+)
 
 
 def watch_and_gestures(facts: Facts) -> list[str]:

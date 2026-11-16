@@ -77,9 +77,15 @@ class InstallAppTests(unittest.TestCase):
             with mock.patch.object(build_mono, "ROOT", Path(folder)):
                 generic = build_mono.signing_arguments(False)
                 (Path(folder) / ".local/device.json").write_text(json.dumps({**device, "device_udid": PHONE["udid"]}))
-                named = build_mono.signing_arguments(False)
+                with mock.patch.object(build_mono, "device_available", return_value=True):
+                    named = build_mono.signing_arguments(False)
+                with mock.patch.object(build_mono, "device_available", return_value=False):
+                    away = build_mono.signing_arguments(False)
         self.assertIn("generic/platform=iOS", generic)
         self.assertIn(f"id={PHONE['udid']}", named)
+        # A named iPhone that is not connected now: any iPhone, signed with the team's existing profile.
+        self.assertIn("generic/platform=iOS", away)
+        self.assertNotIn(f"id={PHONE['udid']}", away)
         self.assertIn("-allowProvisioningDeviceRegistration", named)
         self.assertIn(f"PRODUCT_BUNDLE_IDENTIFIER={device['dev_bundle_id']}", named)
 

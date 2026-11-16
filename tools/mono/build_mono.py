@@ -39,6 +39,9 @@ OUT = check_mono_build.OUT
 TREE, PACKAGES, PUBLISH, EXPORT = OUT / "tree", OUT / "packages", OUT / "publish", OUT / "export"
 PATCHED_LIBRARY, APP, IPA = OUT / "STS2Mobile.FullGame", OUT / "FullGame.app", OUT / "FullGame.ipa"
 PUBLISH_LOG = LOGS / f"{LOG_PREFIX}-publish.log"
+# What the last publish was built from, apart from the interpreted game host (--host-only).
+PUBLISH_INPUTS = OUT / "publish-inputs.json"
+HOST_PROJECT = "STS2Mobile.GameHost"
 GAME_FILES = ROOT / "analysis/game-files"
 PINS = json.loads((ROOT / "tools/dependencies.json").read_text())["mono"]
 # The host export (scripts/export-host.sh): the Xcode project and the main pack this build starts from.
@@ -129,8 +132,12 @@ def signing_arguments(unsigned: bool) -> list[str]:
     if not device.is_file():
         raise ValueError("Signing needs .local/device.json with team and dev_bundle_id. To skip signing, pass --unsigned.")
     values = json.loads(device.read_text())
-    # With the iPhone named, Xcode registers it with the team: a free Apple ID's team gets no profile without one.
-    destination = f"id={values['device_udid']}" if values.get("device_udid") else "generic/platform=iOS"
+    # With the iPhone named, Xcode registers it with the team: a free Apple ID's team gets no profile without one. When it is not
+    # connected, xcodebuild finds no such destination; the team's profile is already in place by then, so build for any iPhone.
+    udid = values.get("device_udid")
+    destination = f"id={udid}" if udid and device_available(udid) else "generic/platform=iOS"
+    if udid and destination.startswith("generic"):
+        print("The iPhone in .local/device.json is not connected: building for any iPhone with the team's existing profile.")
     return [
         "-scheme",
         "FullGame",
@@ -144,6 +151,21 @@ def signing_arguments(unsigned: bool) -> list[str]:
         f"PRODUCT_BUNDLE_IDENTIFIER={values['dev_bundle_id']}",
         "CODE_SIGN_STYLE=Automatic",
     ]
+
+
+def device_available(udid: str) -> bool:
+    """Whether devicectl sees the iPhone connected now. When it cannot tell, the iPhone is named as before."""
+    out = OUT / "devicectl-devices.json"
+    try:
+        subprocess.run(["xcrun", "devicectl", "list", "devices", "--json-output", str(out)], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        devices = json.loads(out.read_text()).get("result", {}).get("devices", [])
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return True
+    for device in devices:
+        if device.get("hardwareProperties", {}).get("udid") == udid:
+            return device.get("connectionProperties", {}).get("tunnelState") != "unavailable"
+    return False
 
 
 def version_settings(env: dict | None = None) -> list[str]:
@@ -222,6 +244,72 @@ def publish() -> None:
         str(PUBLISH),
     ] + [f"-p:{value}" for value in PUBLISH_PROPERTIES]
     run(command, "publish", environment(PACKAGES), TREE, PUBLISH_LOG)
+
+
+def publish_inputs() -> dict[str, str]:
+    """A hash of every file a publish reads, except the interpreted game host's sources (--host-only swaps only that)."""
+    skip = {".godot", "bin", "obj"}
+    files: list[Path] = []
+    for top in (ROOT / "src", ROOT / "mods", ROOT / ".tools/builtin-mods"):
+        if top.is_dir():
+            files += [
+                path for path in top.rglob("*")
+                if path.is_file() and not skip.intersection(path.relative_to(ROOT).parts)
+                and path.relative_to(ROOT).parts[:2] != ("src", HOST_PROJECT)
+            ]
+    files += [ROOT / name for name in ("global.json", "Directory.Build.props", ".editorconfig", "tools/dependencies.json")]
+    return {str(path.relative_to(ROOT)): sha256_file(path) for path in sorted(files) if path.is_file()}
+
+
+def swap_host() -> None:
+    """--host-only: compile the game host alone and put it in the last publish, in place of the one embedded there.
+
+    The host is interpreted (never AOT compiled), so nothing else in the publish depends on its code. Compiled as the publish
+    compiles a referenced project (no runtime identifier), its DLL is the same, byte for byte, as the publish's."""
+    step("Swapping in the game host (the rest of the last publish is reused)")
+    if not PUBLISH_LOG.is_file() or not PUBLISH_INPUTS.is_file():
+        raise ValueError("No publish to reuse: run scripts/build-mono.sh without --host-only first.")
+    before = json.loads(PUBLISH_INPUTS.read_text())
+    now = publish_inputs()
+    changed = sorted(name for name in before.keys() | now.keys() if before.get(name) != now.get(name))
+    if changed:
+        listed = ", ".join(changed[:5]) + (f" and {len(changed) - 5} more" if len(changed) > 5 else "")
+        raise ValueError(f"More than the game host changed since the last publish ({listed}): build without --host-only.")
+    host_tree = TREE / "src" / HOST_PROJECT
+    for path in list(host_tree.iterdir()) if host_tree.is_dir() else []:
+        if path.name not in (".godot", "bin", "obj"):
+            shutil.rmtree(path) if path.is_dir() and not path.is_symlink() else path.unlink()
+    shutil.copytree(ROOT / "src" / HOST_PROJECT, host_tree, ignore=shutil.ignore_patterns(".godot", "bin", "obj"),
+                    symlinks=True, dirs_exist_ok=True)
+    built = OUT / "host-only"
+    shutil.rmtree(built, ignore_errors=True)
+    command = ["dotnet", "build", f"src/{HOST_PROJECT}/{HOST_PROJECT}.csproj", "-c", "ExportRelease", "-v:q", "-nologo",
+               "-o", str(built)] + [f"-p:{value}" for value in PUBLISH_PROPERTIES]
+    run(command, "host-only", environment(PACKAGES), TREE)
+    dll = f"{HOST_PROJECT}.dll"
+    data = (built / dll).read_bytes()
+    shutil.copy2(built / dll, PUBLISH / dll)
+    _, directory, _ = library.parse_link_commands(PUBLISH_LOG.read_text(errors="replace"))
+    marker = f"// Resource Registered Names: {dll}\n"
+    resources = [path for path in directory.glob("bundled_resource_*.c") if marker in path.read_text()]
+    if len(resources) != 1:
+        raise ValueError(f"Expected one embedded copy of {dll} in {directory}, found {len(resources)}.")
+    name = resources[0].stem
+    rows = ",\n".join("  " + ", ".join(f"0x{byte:02x}" for byte in data[at:at + 12]) for at in range(0, len(data), 12))
+    resources[0].write_text(
+        f"#include <stdint.h>\n{marker}uint8_t {name}_data[] __attribute__((aligned(16))) = {{\n{rows}\n}};\n"
+        f"const uint32_t {name}_data_len = {len(data)};\n"
+    )
+    # The resource table registers each assembly with its size as a literal of its own: a host larger than the published one was
+    # read cut short, and Mono refused it ("could not be loaded").
+    table = directory / "mono-bundled-source.c"
+    define = f"#define {name}_data_len_val "
+    lines = table.read_text().splitlines(keepends=True)
+    found = [i for i, line in enumerate(lines) if line.startswith(define)]
+    if len(found) != 1:
+        raise ValueError(f"Expected one size of {dll} in {table}, found {len(found)}.")
+    lines[found[0]] = f"{define}{len(data)}\n"
+    table.write_text("".join(lines))
 
 
 def edit_file(path: Path, edit) -> None:
@@ -377,13 +465,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--unsigned", action="store_true", help="build without signing, for a check of the output only")
     parser.add_argument("--reuse-publish", action="store_true", help="skip the publish and repeat the steps after it")
+    parser.add_argument(
+        "--host-only",
+        action="store_true",
+        help="when only src/STS2Mobile.GameHost changed since the last publish: compile it alone and reuse the rest (seconds, not minutes)",
+    )
     options = parser.parse_args()
+    if options.host_only and options.reuse_publish:
+        raise ValueError("--host-only is for test builds; leave out --reuse-publish.")
     signing_arguments(options.unsigned)  # stop now, not after the publish, when signing values are missing
     check_prerequisites()
-    if not options.reuse_publish:
+    if options.host_only:
+        swap_host()
+    elif not options.reuse_publish:
+        PUBLISH_INPUTS.unlink(missing_ok=True)
+        inputs = publish_inputs()
         prepare_tree()
         patch_godotsharp()
         publish()
+        PUBLISH_INPUTS.write_text(json.dumps(inputs, indent=1))
     elif not PUBLISH_LOG.is_file():
         raise ValueError(f"No publish log to reuse: {PUBLISH_LOG.relative_to(ROOT)}")
     patch_library(relink())

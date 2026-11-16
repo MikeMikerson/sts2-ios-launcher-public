@@ -286,12 +286,26 @@ public sealed class CachedManifestFactAttribute : FactAttribute
     }
 }
 
-/// <summary>The real manifest of the tested version, from Steam's cache on this Mac, with the real pack. Skipped where there is none.</summary>
+/// <summary>
+/// The real manifest of the tested version, from Steam's cache on this Mac, with the real pack. Skipped where there is none, and where
+/// Steam has moved this Mac's install to another version (its <c>release_info.json</c> is not the profile's), as it does on every update.
+/// </summary>
 public sealed class InstalledManifestFactAttribute : FactAttribute
 {
     public InstalledManifestFactAttribute()
     {
         if (!File.Exists(InstalledManifest.Path)) Skip = "No Steam manifest of the supported version on this Mac.";
+        else if (!InstalledManifest.IsVersion(GameProfile.Current.Steam!.ReleaseInfoSha256)) Skip = "Steam's install on this Mac is another version than the profile's.";
+    }
+}
+
+/// <summary>A real manifest from Steam's cache whose files Steam has installed on this Mac. Skipped where either is missing.</summary>
+public sealed class InstalledUntestedManifestFactAttribute : FactAttribute
+{
+    public InstalledUntestedManifestFactAttribute(ulong manifest, string releaseInfoSha256)
+    {
+        if (!File.Exists(InstalledManifest.PathOf(manifest))) Skip = "No such Steam manifest on this Mac.";
+        else if (!InstalledManifest.IsVersion(releaseInfoSha256)) Skip = "Steam's install on this Mac is another version.";
     }
 }
 
@@ -299,6 +313,18 @@ internal static class InstalledManifest
 {
     /// <summary>A manifest of Steam's normal version (Stable) for a build this app is not tested with (build 23811903).</summary>
     public const ulong Stable = 8653035385353091849;
+
+    /// <summary>The beta's v0.113.1 (build 26660232, 2026-11-15), which has no profile: the first update after v0.113.0.</summary>
+    public const ulong Beta113_1 = 44163249761777073;
+    public const string Beta113_1ReleaseInfo = "6446ec25e4f2ee9fba348378b0a036710dec673c37b52d595c67f274c98b988a";
+
+    /// <summary>Whether the installed game's <c>release_info.json</c> has this SHA-256.</summary>
+    public static bool IsVersion(string releaseInfoSha256)
+    {
+        string file = System.IO.Path.Combine(Game, "SlayTheSpire2.app/Contents/Resources", GameLayout.ReleaseInfo);
+        return File.Exists(file) && Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(file))) == releaseInfoSha256;
+    }
+
     private static readonly string Steam = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library/Application Support/Steam");
     public static string Path => PathOf(GameProfile.Current.Steam!.Manifest);
     public static string PathOf(ulong manifest) => System.IO.Path.Combine(Steam, "depotcache", $"{GameLayout.Depot}_{manifest}.manifest");
@@ -364,6 +390,34 @@ public sealed class RealManifestTests : IDisposable
         var result = await new DepotDownload(new NoServer(), plan).RunAsync(CancellationToken.None);
         Assert.Equal(0, result.DownloadedChunks);
         Assert.Equal(plan.Sum(file => file.Source.Chunks.Count), result.ReusedChunks);
+        Assert.All(plan, file => Assert.True(File.Exists(file.Path)));
+    }
+
+    /// <summary>
+    /// A beta update the app has no profile for (v0.113.1) is offered as untested, planned from its manifest by path, and its real files
+    /// pass Steam's SHA-1 alone, so the next steps (tolerant patches, the pack) get a whole game.
+    /// </summary>
+    [InstalledUntestedManifestFact(InstalledManifest.Beta113_1, InstalledManifest.Beta113_1ReleaseInfo)]
+    public async Task AnUntestedBetaUpdateIsPlannedBySteamsHashesAndItsRealFilesPass()
+    {
+        var manifest = DepotManifest.LoadFromFile(InstalledManifest.PathOf(InstalledManifest.Beta113_1))!;
+        var installer = new GameInstaller(_folder, GameProfile.Known, () => 0);
+        var check = installer.Check(new BranchBuild("public-beta", 26660232, manifest.ManifestGID));
+        Assert.Equal(GameVersionProblem.None, check.Problem);
+        Assert.False(check.Tested);
+        var plan = installer.Plan(null, manifest);
+        Assert.Equal(8, plan.Count);
+        Assert.All(plan, file => Assert.Null(file.Sha256));
+        Assert.All(plan, file => Assert.NotNull(file.SteamSha1));
+        foreach (var file in plan)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(file.Path)!);
+            using var copy = Process.Start("cp", ["-c", Path.Combine(InstalledManifest.Game, file.Source.FileName), file.Path + DepotDownload.PartialSuffix]);
+            await copy.WaitForExitAsync();
+            Assert.Equal(0, copy.ExitCode);
+        }
+        var result = await new DepotDownload(new NoServer(), plan).RunAsync(CancellationToken.None);
+        Assert.Equal(0, result.DownloadedChunks);
         Assert.All(plan, file => Assert.True(File.Exists(file.Path)));
     }
 
