@@ -7,6 +7,7 @@
     <Project Path="src/STS2Mobile.GamePatcher/STS2Mobile.GamePatcher.csproj" />
     <Project Path="src/STS2Mobile.GameStub/STS2Mobile.GameStub.csproj" />
     <Project Path="src/STS2Mobile.Launcher/STS2Mobile.Launcher.csproj" />
+    <Project Path="src/STS2Mobile.ModApi/STS2Mobile.ModApi.csproj" />
     <Project Path="src/STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
     <Project Path="src/STS2Mobile.Steam/STS2Mobile.Steam.csproj" />
     <Project Path="src/STS2Mobile.SteamWire/STS2Mobile.SteamWire.csproj" />

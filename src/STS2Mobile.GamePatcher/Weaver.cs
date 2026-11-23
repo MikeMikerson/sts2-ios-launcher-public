@@ -110,6 +110,13 @@ public sealed class Weaver
     /// <summary>Refuses code that could reach the network or load other code; reports Steamworks use.</summary>
     private static List<string> Audit(string id, ModuleDefinition module)
     {
+        foreach (var assembly in module.AssemblyReferences)
+        {
+            if ((assembly.Name.StartsWith("STS2Mobile.", StringComparison.OrdinalIgnoreCase)
+                    && !assembly.Name.Equals("STS2Mobile.ModApi", StringComparison.OrdinalIgnoreCase))
+                || assembly.Name.Equals("SteamKit2", StringComparison.OrdinalIgnoreCase))
+                throw new WeaveException($"{id}: {assembly.Name} is private to the app. Use STS2Mobile.ModApi for multiplayer.");
+        }
         var steamworks = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var type in CecilWalk.Flatten(module.Types))
             foreach (var method in type.Methods)

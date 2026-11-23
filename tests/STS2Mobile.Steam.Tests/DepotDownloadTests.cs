@@ -43,7 +43,7 @@ internal sealed class FakeChunks(byte[] content, int chunkBytes)
         }
     }
 
-    private byte[] Content => content;
+    public byte[] Content => content;
 }
 
 public sealed class DepotDownloadTests : IDisposable

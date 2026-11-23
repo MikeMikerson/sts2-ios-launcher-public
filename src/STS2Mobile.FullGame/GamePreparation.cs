@@ -23,6 +23,8 @@ internal static class GamePreparation
     private const long Megabyte = 1024 * 1024;
     // Stands in for a failed preparation, once per launch, to test the way back with nobody there.
     private static bool _failOnce = OS.GetEnvironment("STS2_PREPARE_FAILURE") == "1";
+    // Checks the game for a member no build has, to show the refusal of a build the app's code cannot run.
+    private static readonly bool MissingReferenceOnPurpose = OS.GetEnvironment("STS2_MISSING_GAME_REFERENCE") == "1";
 
     /// <param name="textureProgress">Textures done and their total, called on the preparation's thread. When they are all done, the pack is written next.</param>
     public static Task<PreparationResult> RunAsync(Action<int, int> textureProgress)
@@ -30,17 +32,30 @@ internal static class GamePreparation
         string folder = GameFolderOnDisk;
         bool fail = _failOnce;
         _failOnce = false;
-        var finished = new TaskCompletionSource<PreparationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        return OnOwnThread("Game preparation", () =>
+        {
+            if (fail) throw new IOException("Test of a failed preparation.");
+            return Run(folder, textureProgress);
+        });
+    }
+
+    /// <summary>
+    /// An untested build's code, checked before the rest of it is downloaded with the app's built-in mods woven in, on a
+    /// thread with the preparation's stack. The test switch <c>STS2_MISSING_GAME_REFERENCE=1</c> refuses it here too.
+    /// </summary>
+    public static Task<CodeCheck> CheckCodeAsync(string originalFolder) => OnOwnThread("Game code check", () =>
+        GameAssemblyPreparation.CheckCode(originalFolder, GameAssemblyPreparation.EmbeddedGameReferences(MissingReferenceOnPurpose ? [GameAssemblyPreparation.MissingOnPurpose] : []),
+            BuiltInModInput.InOriginalFolder, BuiltInModInput.OptionalIds()));
+
+    private static Task<T> OnOwnThread<T>(string name, Func<T> work)
+    {
+        var finished = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         new Thread(() =>
         {
-            try
-            {
-                if (fail) throw new IOException("Test of a failed preparation.");
-                finished.SetResult(Run(folder, textureProgress));
-            }
+            try { finished.SetResult(work()); }
             catch (Exception error) { finished.SetException(error); }
         }, StackBytes)
-        { IsBackground = true, Name = "Game preparation" }.Start();
+        { IsBackground = true, Name = name }.Start();
         return finished.Task;
     }
 
@@ -65,7 +80,7 @@ internal static class GamePreparation
             if (imported.Status != ModImportStatus.Installed)
                 return new PreparationResult(PreparationStatus.Refused, imported.Message);
         }
-        var assembly = Measured("assembly", GameAssemblyPreparation.ForApp(folder, includeImportedMods: ModLaunchSettings.Enabled).Run);
+        var assembly = Measured("assembly", GameAssemblyPreparation.ForApp(folder, includeImportedMods: ModLaunchSettings.Enabled, missingOnPurpose: MissingReferenceOnPurpose).Run);
         if (assembly.Status is PreparationStatus.NoGame or PreparationStatus.Refused) return assembly;
         LogPatches(assembly);
         if (assembly.Patches is { } patches) InstalledBuild.RecordPreparation(folder, assembly.Tested, patches);

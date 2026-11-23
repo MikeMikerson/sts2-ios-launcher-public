@@ -16,12 +16,12 @@
     <PackageDownload Include="Lib.Harmony.Ref" Version="[2.4.2]" />
     <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot)tools/dependencies.json" LogicalName="dependencies.json" />
     <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot)mods/builtin.json" LogicalName="builtin.json" />
-    <!-- The built-in mods' pinned files, which ./setup.sh puts here (tools/setup_ios.py). The app writes them into the game's
-         original folder at preparation; a build without them prepares the game without those mods. QuickMatch's relay
-         settings are not a mod file: the host embeds them (STS2Mobile.GameHost.csproj). -->
-    <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot).tools/builtin-mods/*" Exclude="$(RepositoryRoot).tools/builtin-mods/*.cfg" LogicalName="mods/%(Filename)%(Extension)" />
+    <!-- The game members the host and the adapters use, which preparation checks each build against (GameReferenceList.cs);
+         ./setup.sh lists them here (scripts/list-game-references.sh). -->
+    <EmbeddedResource WithCulture="false" Include="$(RepositoryRoot).tools/game-references.txt" LogicalName="game-references.txt" />
     <!-- Only their signatures, as data: what the patched game calls. The app's own copies are embedded where managed code cannot read their files. -->
     <AdapterProject Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
+    <AdapterProject Include="../STS2Mobile.ModApi/STS2Mobile.ModApi.csproj" />
     <AdapterProject Include="../STS2Mobile.GameAdapters/STS2Mobile.GameAdapters.csproj" />
     <ProjectReference Include="../STS2Mobile.Platform/STS2Mobile.Platform.csproj" />
     <ProjectReference Include="@(AdapterProject)" ReferenceOutputAssembly="false" Private="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=$(AdapterFramework)" />
@@ -37,6 +37,7 @@
     </ItemGroup>
     <Error Condition="!Exists('$(NuGetPackageRoot)/microsoft.netcore.app.ref/9.0.20/ref/net9.0/System.Runtime.dll')" Text="Restore the pinned framework metadata package before building." />
     <Error Condition="!Exists('$(NuGetPackageRoot)/lib.harmony.ref/2.4.2/ref/netstandard2.0/0Harmony.dll')" Text="Restore the pinned preparation metadata packages before building." />
+    <Error Condition="!Exists('$(RepositoryRoot).tools/game-references.txt')" Text="The host's game references are not listed yet: run ./setup.sh --prepare-only (scripts/list-game-references.sh)." />
   </Target>
   <Target Name="EmbedAdapterSignatures" BeforeTargets="AssignTargetPaths;CoreCompile" DependsOnTargets="ResolveProjectReferences">
     <MSBuild Projects="@(AdapterProject)" Targets="GetTargetPath" Properties="TargetFramework=$(AdapterFramework)">

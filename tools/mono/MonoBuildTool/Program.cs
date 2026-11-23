@@ -8,6 +8,9 @@
 //                                                       every game reference in the dlls exists in the real game
 //   MonoBuildTool check-assembly-references <publish folder> <names absent by design, comma separated> <root dll>...
 //                                                       every assembly the roots need is in the publish folder
+//   MonoBuildTool list-game-references <dll>...         prints the game members the dlls use, the list the patcher embeds
+using Mono.Cecil;
+using STS2Mobile.GamePatcher;
 using STS2Mobile.Tools.Mono;
 
 try
@@ -37,8 +40,13 @@ try
             foreach (var line in gone)
                 Console.WriteLine(line);
             return gone.Count == 0 ? 0 : 1;
+        case ["list-game-references", .. var paths] when paths.Length > 0:
+            var modules = paths.Select(path => ModuleDefinition.ReadModule(path)).ToArray();
+            Console.Write(GameReferenceList.Text(GameReferenceList.Of(modules)));
+            foreach (var module in modules) module.Dispose();
+            return 0;
         default:
-            Console.Error.WriteLine("Usage: MonoBuildTool strip-fnptr-mods|rewrite-callables|verify-godotsharp|list-pinvokes|check-game-references|check-assembly-references ...");
+            Console.Error.WriteLine("Usage: MonoBuildTool strip-fnptr-mods|rewrite-callables|verify-godotsharp|list-pinvokes|check-game-references|check-assembly-references|list-game-references ...");
             return 2;
     }
 }

@@ -16,7 +16,6 @@ import shutil
 import subprocess
 import sys
 import tarfile
-import urllib.parse
 import zipfile
 from pathlib import Path
 
@@ -33,8 +32,6 @@ ASSETS = ROOT / "analysis/full-game-assets-clean-v1"
 TEXTURES = ROOT / "analysis/full-game-textures-astc-v1"
 SCENES = ROOT / "analysis/full-game-scenes-phone-v1"
 STEAM = ROOT / "analysis/steam-managed"
-BUILTIN_MODS = ROOT / ".tools/builtin-mods"
-RELAY_FILE = ROOT / ".local/QuickMatchRelay.cfg"
 LIBRARY_BUILDER = "Microsoft.NET.Runtime.LibraryBuilder.Sdk"
 # The source files each prepared stage is made from, including the shared tool modules its scripts
 # import. A stage is prepared again when any of them changes.
@@ -64,6 +61,7 @@ STAGE_SOURCES = {
     ],
     "game-assemblies": [
         "src/STS2Mobile.Platform",
+        "src/STS2Mobile.ModApi",
         "src/STS2Mobile.GameAdapters",
         "src/STS2Mobile.GameStub",
         "mods",
@@ -396,117 +394,6 @@ def provision_native(spec: dict) -> None:
     provision_texture_encoder(spec)
 
 
-def provision_builtin_mods(spec: dict) -> None:
-    """The code mods built into the app (mods/builtin.json), each file checked against its pin, into .tools/builtin-mods.
-
-    A mod comes from its pinned release. Until the release exists (its URL is still a <placeholder>), a copy of the same
-    files in the mod's local_stand_in folder is used; with neither, the app is built without that mod.
-    """
-    if BUILTIN_MODS.exists():
-        shutil.rmtree(BUILTIN_MODS)
-    for mod, entry in spec.get("builtin_mods", {}).items():
-        files = entry["files"]
-        released = not any(item["url"].startswith("<") for item in files.values())
-        stand_in = ROOT / entry["local_stand_in"]
-        if not released and not all((stand_in / name).is_file() for name in files):
-            print(f"{mod}: no release pinned yet and no copy in {entry['local_stand_in']}; building without it.", flush=True)
-            continue
-        sources = {}
-        for name, item in files.items():
-            source = download(f"{mod}-{name}", item) if released else stand_in / name
-            if digest(source) != item["sha256"]:
-                raise ValueError(f"{mod}: {source.relative_to(ROOT)} does not match its pin in tools/dependencies.json.")
-            sources[name] = source
-        BUILTIN_MODS.mkdir(parents=True, exist_ok=True)
-        for name, source in sources.items():
-            shutil.copy2(source, BUILTIN_MODS / name)
-        print(f"{mod} {entry['version']} built in ({'release' if released else 'local stand-in'}).", flush=True)
-
-
-def relay_address(url: str) -> str:
-    """wss://<host> or https://<host>, as the app accepts it (src/STS2Mobile.Platform/RelaySettings.cs); ValueError otherwise."""
-    parts = urllib.parse.urlsplit(url.strip())
-    try:
-        port = parts.port
-    except ValueError:
-        port = -1
-    host = parts.hostname or ""
-    if (
-        parts.scheme not in {"wss", "https"}
-        or not host
-        or port not in (None, 443)
-        or parts.username
-        or parts.password
-        or parts.path not in ("", "/")
-        or parts.query
-        or parts.fragment
-        or "." not in host
-        or host.endswith(".")
-        or not re.fullmatch(r"[a-z0-9.-]+", host)
-        or re.fullmatch(r"[0-9.]+", host)
-    ):
-        raise ValueError("a relay address is wss://<host> or https://<host> on port 443, with nothing after the host.")
-    return f"{parts.scheme}://{host}"
-
-
-def relay_from_file(text: str, name: str) -> str | None:
-    """The relay a QuickMatchRelay.cfg names, or None when it names none or says enabled = false.
-
-    The format the app reads: `key = value` lines (`relay = https://<host>`, `enabled = true|false`) and # comments. Any
-    problem stops setup, where the app would silently drop the relay."""
-    values: dict[str, str] = {}
-    for number, line in enumerate(text.splitlines(), 1):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        key, equals, value = line.partition("=")
-        key, value = key.strip().lower(), value.strip()
-        if not equals or not key:
-            raise ValueError(f"{name} line {number}: expected key = value")
-        if key in values:
-            raise ValueError(f"{name} line {number}: {key} is set twice")
-        if key == "enabled" and value.lower() not in {"true", "on", "yes", "false", "off", "no"}:
-            raise ValueError(f"{name} line {number}: enabled is true or false")
-        if key not in {"enabled", "relay"}:
-            raise ValueError(f'{name} line {number}: unknown setting "{key}" (known: enabled, relay)')
-        if key == "relay":
-            try:
-                value = relay_address(value)
-            except ValueError as error:
-                raise ValueError(f"{name} line {number}: {error}") from None
-        values[key] = value
-    if values.get("enabled", "true").lower() in {"false", "off", "no"}:
-        return None
-    return values.get("relay")
-
-
-def provision_quickmatch_relay() -> None:
-    """QuickMatch's relay, chosen by whoever builds the app, never by a tracked file.
-
-    QUICKMATCH_RELAY=wss://<host> (or https://<host>) in the environment, else .local/QuickMatchRelay.cfg, both checked as
-    the app checks them. With neither, the app has no relay and QuickMatch matches over Steam lobby chat.
-    """
-    if not (BUILTIN_MODS / "QuickMatch.dll").is_file():
-        return
-    url = os.environ.get("QUICKMATCH_RELAY", "").strip()
-    if url:
-        try:
-            relay, source = relay_address(url), "QUICKMATCH_RELAY"
-        except ValueError as error:
-            raise ValueError(f"QUICKMATCH_RELAY: {error}") from None
-    elif RELAY_FILE.is_file():
-        source = RELAY_FILE.relative_to(ROOT).as_posix()
-        relay = relay_from_file(RELAY_FILE.read_text(), source)
-        if relay is None:
-            print(f"QuickMatch: {source} sets no relay; matches use Steam lobby chat.", flush=True)
-            return
-    else:
-        print("QuickMatch: no relay set (QUICKMATCH_RELAY or .local/QuickMatchRelay.cfg); matches use Steam lobby chat.")
-        return
-    (BUILTIN_MODS / "QuickMatchRelay.cfg").write_text(f"relay = {relay}\n")
-    print(f"QuickMatch relay built in, from {source}.", flush=True)
-
-
 def provision_texture_encoder(spec: dict) -> None:
     import build_texture_encoder as encoder
 
@@ -581,6 +468,8 @@ def prepare_steam(environment: dict) -> None:
 
 def pipeline(environment: dict, prepare_only: bool, install: bool = False) -> None:
     prepare_steam(environment)
+    # Before anything builds the patcher, which embeds the list (src/STS2Mobile.GamePatcher).
+    run(["bash", "scripts/list-game-references.sh"], "List game references", environment)
     run(
         [str(PYTHON), "tools/prepare_full_game_project.py", "--steam", str(STEAM / "steam")],
         "Prepare host project",
@@ -631,8 +520,6 @@ def main() -> None:
         provision_library_builder(spec)
         provision_godot(spec["downloads"], environment)
         provision_native(spec)
-        provision_builtin_mods(spec)
-        provision_quickmatch_relay()
         pipeline(environment, options.prepare_only, options.install)
 
 

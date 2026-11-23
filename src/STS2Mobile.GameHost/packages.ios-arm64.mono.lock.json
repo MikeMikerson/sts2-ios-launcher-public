@@ -20,8 +20,14 @@
           "GodotSharp": "[4.5.1, )"
         }
       },
-      "sts2mobile.platform": {
+      "sts2mobile.modapi": {
         "type": "Project"
+      },
+      "sts2mobile.platform": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.ModApi": "[1.0.0, )"
+        }
       }
     },
     "net10.0/ios-arm64": {}

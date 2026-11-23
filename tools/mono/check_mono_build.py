@@ -249,19 +249,16 @@ VOICE_FUNCTIONS = (
     "sts2_voice_capture_status", "sts2_voice_read", "sts2_voice_queued", "sts2_voice_play", "sts2_voice_stop_output",
     "sts2_voice_route", "sts2_voice_last_error", "sts2_voice_audio_state",
 )
-VOICE_MOD = ROOT / ".tools/builtin-mods/QuickMatch.dll"
 
 
 def voice_audio(facts: Facts) -> list[str]:
-    """The app exports every voice function, and says what the microphone is for exactly when it carries QuickMatch."""
+    """Check voice exports and the microphone usage description."""
     exported = set(run(["nm", "-g", "-U", "-j", str(facts.app / "FullGame")]).split())
     with (facts.app / "Info.plist").open("rb") as handle:
         purpose = plistlib.load(handle).get("NSMicrophoneUsageDescription")
-    with_voice = VOICE_MOD.is_file()
     return report(
         *(f"the app does not export {name}" for name in VOICE_FUNCTIONS if "_" + name not in exported),
-        None if bool(purpose) == with_voice else
-        ("the app with QuickMatch has no microphone text" if with_voice else "the app without QuickMatch asks for the microphone"),
+        None if purpose else "the app has no microphone purpose string",
     )
 
 
@@ -302,7 +299,7 @@ def assemblies_present(facts: Facts) -> list[str]:
     """Everything the app's assemblies refer to is in the publish, and when the game's files are here, the same for the game."""
     game = [*sorted(GAME_FILES.glob("*.dll")), *sorted((GAME_FILES / "original").glob("*.dll"))]
     roots = [*sorted(PUBLISH.glob("STS2Mobile.*.dll")), *game]
-    # The built-in mods (QuickMatch) are woven at preparation and load from the game's folder too.
+    # The catalogued mods are woven at preparation and load from the game's folder too.
     built_in = [entry["id"] for entry in json.loads((ROOT / "mods/builtin.json").read_text())["mods"]]
     command = [str(TOOL), "check-assembly-references", str(PUBLISH), ",".join([*GAME_ASSEMBLIES, *built_in]), *map(str, roots)]
     result = subprocess.run(command, capture_output=True, text=True, env=os.environ | {"DOTNET_ROOT": str(ROOT / "tools/ios-dotnet")})
@@ -332,7 +329,7 @@ CHECKS = [
     ("pinned runtime, app contents", runtime_and_app),
     ("game assembly hook installed at load", game_assembly_hook),
     ("texture encoder linked, its internals hidden", texture_encoder),
-    ("voice audio exported, microphone text with QuickMatch", voice_audio),
+    ("voice audio exported, microphone purpose set", voice_audio),
     ("FMOD file thread leaves the file's reference count alone", fmod_file_thread),
     ("GPU watch and edge gestures exported", watch_and_gestures),
     ("library stripped, unused assemblies removed", size_steps),

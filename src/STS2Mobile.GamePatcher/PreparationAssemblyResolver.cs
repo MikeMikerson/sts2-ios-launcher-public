@@ -20,7 +20,8 @@ public sealed class PreparationAssemblyResolver(string folder) : IAssemblyResolv
     {
         if (_read.TryGetValue(name.Name, out var known)) return known;
         // Never use the machine's framework or Harmony installation. Those can differ from iOS.
-        var embedded = typeof(PreparationAssemblyResolver).Assembly.GetManifestResourceStream("metadata/" + name.Name + ".dll");
+        string resource = name.Name == "STS2Mobile.ModApi" ? "adapters/STS2Mobile.ModApi.dll" : "metadata/" + name.Name + ".dll";
+        var embedded = typeof(PreparationAssemblyResolver).Assembly.GetManifestResourceStream(resource);
         var reader = new ReaderParameters { AssemblyResolver = this, ReadingMode = ReadingMode.Deferred, InMemory = true };
         AssemblyDefinition assembly;
         if (embedded != null)

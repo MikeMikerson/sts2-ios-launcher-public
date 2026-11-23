@@ -14,6 +14,8 @@ public class WeaverRefusalTests
     [InlineData("overload ambiguity", "overloaded")]
     [InlineData("same target twice", "more than once")]
     [InlineData("wrong result type", "__result")]
+    [InlineData("STS2Mobile.Platform", "private to the app")]
+    [InlineData("SteamKit2", "private to the app")]
     [InlineData("network use", "System.Net.Http.HttpClient")]
     [InlineData("other Harmony call", "UnpatchAll()")]
     [InlineData("assembly name", "named Other")]
@@ -85,6 +87,10 @@ public class WeaverRefusalTests
                 break;
             case "wrong result type":
                 PatchMethod(mod, "TryPatch", "Postfix").Parameters[0].ParameterType = new ByReferenceType(module.TypeSystem.String);
+                break;
+            case "STS2Mobile.Platform":
+            case "SteamKit2":
+                module.AssemblyReferences.Add(new AssemblyNameReference(form, new Version(1, 0)));
                 break;
             case "network use":
                 {

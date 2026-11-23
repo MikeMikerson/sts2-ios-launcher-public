@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace STS2Mobile.GamePatcher.Tests;
 
 /// <summary>
-/// An optional built-in mod (QuickMatch): written into the original folder from the app's own copy, left out
+/// An optional built-in mod is written into the original folder from the app's own copy, left out
 /// when the app was built without it, and when it cannot be prepared, the game starts without it and the player is told.
 /// </summary>
 public sealed class OptionalBuiltInModTests : IDisposable
@@ -57,10 +57,6 @@ public sealed class OptionalBuiltInModTests : IDisposable
     public void TheMacLeavesOutAnOptionalModSetupDidNotFetch() =>
         Assert.Empty(BuiltInModInput.AtCatalogPaths(Catalog(Sha(Dll))));
 
-    [Fact]
-    public void TheRepositoryCatalogMarksQuickMatchOptional() =>
-        Assert.Contains("QuickMatch", BuiltInModInput.OptionalIds());
-
     /// <summary>A game folder as a download leaves it, from the Steam install of v0.113.0.</summary>
     private string GameFolder()
     {
@@ -90,28 +86,5 @@ public sealed class OptionalBuiltInModTests : IDisposable
         var again = GameAssemblyPreparation.ForApp(game, includeImportedMods: true, BuiltIn, BuiltInModInput.OptionalIds(catalog)).Run();
         Assert.Equal(PreparationStatus.Cached, again.Status);
         Assert.Equal(result.Notice, again.Notice);
-    }
-
-    [InstalledGameFact]
-    public void QuickMatchIsWovenInWhenSetupFetchedIt()
-    {
-        string fetched = Path.Combine(RepositoryRoot(), ".tools/builtin-mods");
-        if (!File.Exists(Path.Combine(fetched, "QuickMatch.dll"))) return; // A checkout built without QuickMatch: nothing to weave.
-        string game = GameFolder();
-        var result = GameAssemblyPreparation.ForApp(game, includeImportedMods: true,
-            original => BuiltInModInput.InOriginalFolder(original, File.ReadAllText(Path.Combine(RepositoryRoot(), "mods/builtin.json")),
-                name => File.Exists(Path.Combine(fetched, name)) ? File.OpenRead(Path.Combine(fetched, name)) : null),
-            BuiltInModInput.OptionalIds()).Run();
-        Assert.Equal(PreparationStatus.Prepared, result.Status);
-        Assert.Null(result.Notice);
-        var woven = Assert.Single(STS2Mobile.Platform.BuiltInMods.ParseCatalog(File.ReadAllText(Path.Combine(game, STS2Mobile.GamePatcher.GameFolder.ModCatalog))));
-        Assert.Equal(("QuickMatch", 30), (woven.Id, woven.Patches));
-    }
-
-    private static string RepositoryRoot()
-    {
-        var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder != null && !File.Exists(Path.Combine(folder.FullName, "mods/builtin.json"))) folder = folder.Parent;
-        return folder?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
     }
 }

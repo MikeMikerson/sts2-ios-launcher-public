@@ -46,60 +46,12 @@ public sealed partial class GameEntry : Node, IGameEntry
         StartAutomaticPlay();
         if (OS.GetEnvironment("STS2_PORTRAIT_PROOF").Length > 0)
             _ = RunPortraitProofAfterLauncherHidesAsync(game);
-        string multiplayer = OS.GetEnvironment("STS2_OPEN_MULTIPLAYER");
-        if (multiplayer is "1" or "quickmatch") await ShowMultiplayerMenuAsync(game, multiplayer == "quickmatch");
     }
 
     private async Task RunPortraitProofAfterLauncherHidesAsync(NGame game)
     {
         for (int frame = 0; frame < 3; frame++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         await PortraitProof.RunIfRequestedAsync(GetTree(), game);
-    }
-
-    /// <summary>
-    /// <c>STS2_OPEN_MULTIPLAYER=1</c> opens the game's multiplayer menu once the main menu is up and logs the QuickMatch buttons in it, so a
-    /// run with nobody there shows whether the mod is in the game. <c>STS2_OPEN_MULTIPLAYER=quickmatch</c> then presses Quick
-    /// Match and picks a party of two, as a player would, so QuickMatch searches Steam's lobbies and hosts one if it finds none.
-    /// Test switches: they change nothing else.
-    /// </summary>
-    private async Task ShowMultiplayerMenuAsync(NGame game, bool startQuickMatch)
-    {
-        try
-        {
-            var menu = game.MainMenu!;
-            menu.GetType().GetMethod("OpenMultiplayerSubmenu", Type.EmptyTypes)!.Invoke(menu, null);
-            for (int frame = 0; frame < 90; frame++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            var buttons = Descendants(GetTree().Root).Where(node => node.Name.ToString().StartsWith("QuickMatch", StringComparison.Ordinal))
-                .Select(node => $"{node.Name} (shown {(node as CanvasItem)?.IsVisibleInTree() ?? false})").ToArray();
-            GD.Print($"Multiplayer menu open: QuickMatch buttons: {(buttons.Length == 0 ? "none" : string.Join(", ", buttons))}.");
-            if (!startQuickMatch) return;
-            if (!await PressAsync("QuickMatchButton") || !await PressAsync("StandardButton")) return;
-            GD.Print("Quick Match pressed with a party of two.");
-        }
-        catch (Exception error) { GD.Print($"Multiplayer menu check failed: {error.GetType().Name}: {error.Message}"); }
-    }
-
-    /// <summary>Clicks the first shown button of that name, then waits for the screen to follow.</summary>
-    private async Task<bool> PressAsync(string name)
-    {
-        var button = Descendants(GetTree().Root).FirstOrDefault(node => node.Name.ToString() == name && (node as CanvasItem)?.IsVisibleInTree() == true);
-        if (button == null)
-        {
-            GD.Print($"Multiplayer menu check: no shown {name} to press.");
-            return false;
-        }
-        button.Call("ForceClick");
-        for (int frame = 0; frame < 60; frame++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        return true;
-    }
-
-    private static System.Collections.Generic.IEnumerable<Node> Descendants(Node node)
-    {
-        foreach (Node child in node.GetChildren())
-        {
-            yield return child;
-            foreach (Node below in Descendants(child)) yield return below;
-        }
     }
 
     /// <summary>
@@ -138,19 +90,8 @@ public sealed partial class GameEntry : Node, IGameEntry
         }
         if (BuiltInMods.All.Count == 0 && Godot.FileAccess.FileExists(ModCatalog))
             BuiltInMods.Register(BuiltInMods.ParseCatalog(Godot.FileAccess.GetFileAsString(ModCatalog)), id => Assembly.Load(new AssemblyName(id)), message => GD.Print(message));
-        InstallQuickMatchHooks();
+        PhoneRelayConnector.Register(ProjectSettings.GlobalizePath("user://" + ModPackageImport.FolderName));
         BuiltInMods.WriteManifests(ProjectSettings.GlobalizePath("user://mods"), ProjectSettings.GlobalizePath("user://game"));
         ModPackageImport.PublishResources(ProjectSettings.GlobalizePath("user://" + ModPackageImport.FolderName), ProjectSettings.GlobalizePath("user://mods"), BuiltInMods.All.Select(mod => mod.Id).ToArray());
-    }
-
-    /// <summary>QuickMatch's hooks, before the game's loader runs its initializer, when it was woven in and this host was built with it.</summary>
-    private static void InstallQuickMatchHooks()
-    {
-        if (!BuiltInMods.All.Any(mod => mod.Id == "QuickMatch")) return;
-#if QUICKMATCH
-        GD.Print($"QuickMatch: hooks set ({QuickMatchHooks.Install()}).");
-#else
-        GD.Print("QuickMatch is woven in, but this host was built without it, so its hooks are not set.");
-#endif
     }
 }

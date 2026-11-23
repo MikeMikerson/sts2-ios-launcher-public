@@ -66,22 +66,6 @@
       "output_sha256": "763ebdbaf2f51a32326d13b3f01117c583928036dafe371a4feb5540d9070728"
     }
   },
-  "builtin_mods": {
-    "QuickMatch": {
-      "version": "0.3.1",
-      "local_stand_in": ".local/quickmatch",
-      "files": {
-        "QuickMatch.dll": {
-          "url": "https://github.com/MikeMikerson/sts2-quickmatch/releases/download/v0.3.1/QuickMatch.dll",
-          "sha256": "4c556b610a2be84eda0a81cc0800ee8264ba41ea6f9561514f3c13a51a8a4cfc"
-        },
-        "QuickMatch.json": {
-          "url": "https://github.com/MikeMikerson/sts2-quickmatch/releases/download/v0.3.1/QuickMatch.json",
-          "sha256": "cf15b3eb81d3845906f6094c23308da8448b1be6ba7098c5815ffde9d1948fef"
-        }
-      }
-    }
-  },
   "downloads": {
     "astc-encoder": {
       "url": "https://github.com/ARM-software/astc-encoder/archive/bf32abd05eccaf3042170b2a85cebdf0bfee5873.tar.gz",

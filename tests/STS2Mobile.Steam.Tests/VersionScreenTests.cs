@@ -23,12 +23,12 @@ public sealed class VersionScreenTests : IDisposable
     private static string[] Labels(VersionScreen screen) => screen.Buttons.Select(button => button.Label).ToArray();
 
     [Fact]
-    public void AnUntestedStableIsNotOffered()
+    public void AnUntestedStableIsOfferedLikeAnUntestedBeta()
     {
         var screen = Screen(Beta);
-        Assert.Equal([VersionScreen.DeleteLabel], Labels(screen));
-        Assert.Equal(new VersionFact("Steam's Stable now", "build 23811903, untested, not offered yet"), screen.Facts.Single(fact => fact.Label == "Steam's Stable now"));
-        Assert.Equal([VersionScreen.SwitchToBetaLabel, VersionScreen.DeleteLabel], Labels(Screen(new InstalledBuild("", 0, 0, "0.99.0", Tested: false))));
+        Assert.Equal([VersionScreen.SwitchToStableLabel, VersionScreen.DeleteLabel], Labels(screen));
+        Assert.Equal(new VersionFact("Steam's Stable now", "build 23811903, untested"), screen.Facts.Single(fact => fact.Label == "Steam's Stable now"));
+        Assert.Equal([VersionScreen.SwitchToStableLabel, VersionScreen.SwitchToBetaLabel, VersionScreen.DeleteLabel], Labels(Screen(new InstalledBuild("", 0, 0, "0.99.0", Tested: false))));
     }
 
     [Fact]

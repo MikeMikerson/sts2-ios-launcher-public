@@ -11,16 +11,23 @@ public static class PickedModImport
     /// code, or one that replaces a mod already here), with that result's message. Null when the player said no. The install runs off the
     /// caller's thread and everything after it, <paramref name="ask"/> included, back on the caller's context.
     /// </summary>
-    public static async Task<ModImportResult?> InstallAsync(string archive, string inputsDirectory, Func<ModImportResult, Task<bool>> ask)
+    public static Task<ModImportResult?> InstallAsync(string archive, string inputsDirectory, Func<ModImportResult, Task<bool>> ask) =>
+        InstallAsync(archive, inputsDirectory, ask, RelayPermissions.Device);
+
+    internal static async Task<ModImportResult?> InstallAsync(string archive, string inputsDirectory, Func<ModImportResult, Task<bool>> ask,
+        IRelayPermissions permissions)
     {
         bool code = false, replace = false;
-        var result = await Task.Run(() => ModPackageImport.Install(archive, inputsDirectory, replace, code));
-        while (result.Status is ModImportStatus.NeedsCodeConfirmation or ModImportStatus.NeedsReplaceConfirmation)
+        RelayDecision? relay = null;
+        var result = await Task.Run(() => ModPackageImport.Install(archive, inputsDirectory, replace, code, relay, permissions));
+        while (result.Status is ModImportStatus.NeedsCodeConfirmation or ModImportStatus.NeedsReplaceConfirmation or ModImportStatus.NeedsRelayConfirmation)
         {
-            if (!await ask(result)) return null;
-            if (result.Status == ModImportStatus.NeedsCodeConfirmation) code = true;
+            bool allow = await ask(result);
+            if (result.Status == ModImportStatus.NeedsRelayConfirmation) relay = new(result.Id!, result.RelayHost!, allow);
+            else if (!allow) return null;
+            else if (result.Status == ModImportStatus.NeedsCodeConfirmation) code = true;
             else replace = true;
-            result = await Task.Run(() => ModPackageImport.Install(archive, inputsDirectory, replace, code));
+            result = await Task.Run(() => ModPackageImport.Install(archive, inputsDirectory, replace, code, relay, permissions));
         }
         return result;
     }

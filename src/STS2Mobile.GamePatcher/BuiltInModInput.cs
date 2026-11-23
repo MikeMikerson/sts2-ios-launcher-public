@@ -43,7 +43,7 @@ public sealed record BuiltInModInput(string Id, string DllPath, string ManifestP
 
     /// <summary>
     /// The catalog this app was built with. Its mods sit in the original files (<c>mods/&lt;id&gt;.dll</c>, <c>.json</c> and an
-    /// optional <c>.pck</c>), written there from the app's own copies. An optional mod (QuickMatch) counts only when this app
+    /// optional <c>.pck</c>), written there from the app's own copies. An optional mod counts only when this app
     /// carries it, so a build without it never weaves a copy an earlier build left behind.
     /// </summary>
     public static IReadOnlyList<BuiltInModInput> InOriginalFolder(string original) =>

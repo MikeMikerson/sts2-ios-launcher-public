@@ -1,11 +1,16 @@
 using System.Reflection;
 using Game;
+using STS2Mobile.ModApi;
 using HarmonyLib;
 
 namespace GoodMod;
 
 public static class Main
 {
+    public static ulong LobbyPlayer() => Multiplayer.Lobbies?.LocalId ?? 0;
+    public static bool HasVoiceDevice() => Multiplayer.Voice != null;
+    public static bool HasRelay() => Multiplayer.GetRelay() != null;
+
     public static void Initialize() => new Harmony("good.mod").PatchAll(Assembly.GetExecutingAssembly());
     public static void InitializeWithoutAssembly() => new Harmony("good.mod").PatchAll();
 }

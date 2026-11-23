@@ -1,7 +1,7 @@
-// QuickMatch voice chat on the iPhone: the microphone, and the teammates' voices coming out.
+// Voice chat on the iPhone: the microphone, and the teammates' voices coming out.
 //
-// The managed side (STS2Mobile.Platform/VoiceAudio.cs, used by STS2Mobile.GameHost/PhoneVoiceDevice.cs)
-// looks the sts2_voice_* functions up in the app by name. Nothing here runs until the player turns their mic on in a quick match or a
+// The managed side (STS2Mobile.Platform/VoiceAudio.cs, used by STS2Mobile.Platform/PhoneVoiceDevice.cs)
+// looks the sts2_voice_* functions up in the app by name. Nothing here runs until the player turns their mic on or a
 // teammate speaks; the game's own sound (FMOD) is never touched.
 //
 // - Playing: one AVAudioEngine whose source node plays 16 kHz mono voice from a ring buffer that the
@@ -391,7 +391,7 @@ void Check() {
 
 }  // namespace
 
-// 0 cannot record, 1 not asked yet, 2 asking, 3 refused, 4 ready (VoiceCaptureState in QuickMatch).
+// 0 cannot record, 1 not asked yet, 2 asking, 3 refused, 4 ready (MicrophoneState).
 extern "C" __attribute__((visibility("default"))) int sts2_voice_capture_state(void) {
 	if (gAsking.load()) {
 		return 2;

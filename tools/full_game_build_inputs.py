@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PROJECTS = (
     "STS2Mobile.FullGame",
     "STS2Mobile.Platform",
+    "STS2Mobile.ModApi",
     "STS2Mobile.Steam",
     "STS2Mobile.Launcher",
     "STS2Mobile.GameAdapters",
@@ -62,10 +63,9 @@ def snapshot(root: Path = ROOT) -> dict[str, str]:
                 and not (IGNORED_DIRECTORIES | {"ios-dotnet", "python", "__pycache__", "mono"}) & set(relative.parts)
             ):
                 files[str(relative)] = sha256_file(path)
-    # The built-in mods setup fetched, which the patcher embeds and the host compiles against.
-    for path in sorted((root / ".tools/builtin-mods").glob("*")):
-        if path.is_file():
-            files[str(path.relative_to(root))] = sha256_file(path)
+    # The host's game references, which the patcher embeds (scripts/list-game-references.sh).
+    if (root / ".tools/game-references.txt").is_file():
+        files[".tools/game-references.txt"] = sha256_file(root / ".tools/game-references.txt")
     return files
 
 

@@ -145,8 +145,14 @@
           "STS2Mobile.Steam": "[1.0.0, )"
         }
       },
-      "sts2mobile.platform": {
+      "sts2mobile.modapi": {
         "type": "Project"
+      },
+      "sts2mobile.platform": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.ModApi": "[1.0.0, )"
+        }
       },
       "sts2mobile.steam": {
         "type": "Project",

@@ -64,18 +64,108 @@ public sealed class GameInstallerTests : IDisposable
         Assert.False(File.Exists(Record));
     }
 
-    /// <summary>The host code is built against one game version, and an older Stable did not start: Stable waits for a tested build.</summary>
+    /// <summary>Stable is offered as Beta is, tested or not: an untested one's code is checked before anything else is fetched.</summary>
     [Fact]
-    public void AnUntestedStableIsNotOfferedButATestedOneIs()
+    public void AnUntestedStableIsACandidateLikeAnUntestedBeta()
     {
         var untested = Installer().Check(new BranchBuild(GameInstaller.NormalBranch, 9, 999));
-        Assert.Equal(GameVersionProblem.UntestedStable, untested.Problem);
+        Assert.Equal(GameVersionProblem.None, untested.Problem);
         Assert.False(untested.Tested);
-        Assert.Contains("does not run with this app yet", GameInstallMessages.Problem(untested, "Stable"));
-        Assert.Contains("Nothing was downloaded or deleted", GameInstallMessages.Problem(untested, "Stable"));
+        Assert.False(untested.CodeChecked);
         var tested = Installer().Check(new BranchBuild(GameInstaller.NormalBranch, 9, Manifest));
         Assert.Equal(GameVersionProblem.None, tested.Problem);
         Assert.True(tested.Tested);
+    }
+
+    [Fact]
+    public void TheCodePlanIsTheAssembliesThePatchesReadInAFolderBesideTheGame()
+    {
+        var installer = Installer();
+        var plan = installer.Plan(null, ManifestOf());
+        var code = installer.CodePlan(999, plan);
+        string folder = Path.Combine(Game + GameInstaller.CheckSuffix, "999", "original");
+        Assert.Equal(new[] { "Sentry.Godot.dll", "Sentry.dll", "sts2.dll" }.Select(name => Path.Combine(folder, name)), code.Select(file => file.Path).Order(StringComparer.Ordinal));
+        Assert.All(code, file => Assert.Same(plan.Single(other => Path.GetFileName(other.Path) == Path.GetFileName(file.Path)).Source, file.Source));
+    }
+
+    /// <summary>A plan whose one file is <c>original/sts2.dll</c>, served by <paramref name="chunks"/>.</summary>
+    private DepotFile[] CodeOnlyPlan(FakeChunks chunks)
+    {
+        var source = chunks.File();
+        source.FileHash = SHA1.HashData(chunks.Content);
+        return [new DepotFile(source, Path.Combine(Game, "original/sts2.dll"), null)];
+    }
+
+    [Fact]
+    public async Task AnUntestedBuildWhoseCodeCannotRunIsRefusedWithNothingElseTouched()
+    {
+        WriteGame();
+        var installer = Installer();
+        var chunks = new FakeChunks("new code"u8.ToArray(), 4);
+        string? checkedFolder = null;
+        var check = await installer.CheckCodeAsync(installer.Check(new BranchBuild(GameInstaller.NormalBranch, 23811903, 999)), CodeOnlyPlan(chunks), chunks.Source, folder =>
+        {
+            checkedFolder = folder;
+            Assert.Equal("new code", File.ReadAllText(Path.Combine(folder, "sts2.dll")));
+            return Task.FromResult(new CodeCheck("it lacks Game.Thing::Count System.Int32, which the app's code uses", []));
+        }, CancellationToken.None);
+
+        Assert.Equal(GameVersionProblem.CannotRun, check.Problem);
+        Assert.True(check.CodeChecked);
+        Assert.Equal(Path.Combine(Game + GameInstaller.CheckSuffix, "999", "original"), checkedFolder);
+        Assert.False(Directory.Exists(Path.GetDirectoryName(checkedFolder)));
+        Assert.Equal("old", File.ReadAllText(Path.Combine(Game, "original/sts2.dll")));
+        Assert.False(File.Exists(Record));
+        string message = GameInstallMessages.Problem(check, "Stable");
+        Assert.Contains("Steam's Stable version (build 23811903, untested) cannot run with this app: it lacks Game.Thing::Count System.Int32, which the app's code uses.", message);
+        Assert.Contains("nothing else was downloaded or deleted", message);
+    }
+
+    [Fact]
+    public async Task CodeThatRunsIsTakenIntoTheDownloadAndNotFetchedAgain()
+    {
+        WriteGame();
+        var installer = Installer();
+        var chunks = new FakeChunks("new code"u8.ToArray(), 4);
+        var plan = CodeOnlyPlan(chunks);
+        var check = await installer.CheckCodeAsync(installer.Check(new BranchBuild(GameInstaller.BetaBranch, 26660232, 999)), plan, chunks.Source,
+            _ => Task.FromResult(new CodeCheck(null, ["Smaller fonts"], [new ModLeftOut("Opt", "Optional Mod", "it does not fit")])), CancellationToken.None);
+        Assert.Equal(GameVersionProblem.None, check.Problem);
+        Assert.Equal(["Smaller fonts"], check.Skipped);
+        Assert.Equal("Optional Mod", Assert.Single(check.LeftOut!).Name);
+        Assert.Contains("plays without: Smaller fonts", GameInstallMessages.UntestedNote(check));
+        int fetched = chunks.Reads.Count;
+
+        installer.Begin(GameInstaller.BetaBranch, 999, 26660232);
+        installer.TakeCheckedCode(999, plan);
+        Assert.False(Directory.Exists(Game + GameInstaller.CheckSuffix));
+        var result = await installer.DownloadAsync(plan, chunks.Source, null, CancellationToken.None);
+        Assert.Equal(1, result.ReusedFiles);
+        Assert.Equal(fetched, chunks.Reads.Count);
+        Assert.Equal("new code", File.ReadAllText(Path.Combine(Game, "original/sts2.dll")));
+    }
+
+    [Fact]
+    public async Task ATestedBuildsCodeIsNotFetchedToCheck()
+    {
+        var installer = Installer();
+        var chunks = new FakeChunks("code"u8.ToArray(), 4);
+        var check = await installer.CheckCodeAsync(installer.Check(new BranchBuild(GameInstaller.NormalBranch, 9, Manifest)), CodeOnlyPlan(chunks), chunks.Source,
+            _ => throw new InvalidOperationException("checked"), CancellationToken.None);
+        Assert.Equal(GameVersionProblem.None, check.Problem);
+        Assert.False(check.CodeChecked);
+        Assert.Empty(chunks.Reads);
+        Assert.False(Directory.Exists(Game + GameInstaller.CheckSuffix));
+    }
+
+    [Fact]
+    public void DeletingTheGameDeletesCheckedCodeToo()
+    {
+        WriteGame();
+        Directory.CreateDirectory(Path.Combine(Game + GameInstaller.CheckSuffix, "999", "original"));
+        Installer().Delete();
+        Assert.False(Directory.Exists(Game));
+        Assert.False(Directory.Exists(Game + GameInstaller.CheckSuffix));
     }
 
     [Fact]

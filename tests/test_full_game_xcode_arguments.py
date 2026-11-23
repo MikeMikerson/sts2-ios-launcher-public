@@ -179,13 +179,8 @@ class InfoPropertyTests(unittest.TestCase):
             "NSMicrophoneUsageDescription": "Unused",
             "UIRequiresFullScreen": True,
         }
-        fill_purpose_strings(properties, with_voice=False)
-        self.assertEqual(properties, {"UIRequiresFullScreen": True})
-
-    def test_voice_build_says_what_the_microphone_is_for(self):
-        properties = {"NSMicrophoneUsageDescription": "", "NSCameraUsageDescription": ""}
-        fill_purpose_strings(properties, with_voice=True)
-        self.assertEqual(properties, {"NSMicrophoneUsageDescription": MICROPHONE_PURPOSE})
+        fill_purpose_strings(properties)
+        self.assertEqual(properties, {"UIRequiresFullScreen": True, "NSMicrophoneUsageDescription": MICROPHONE_PURPOSE})
 
 
 class SceneLifecycleTests(unittest.TestCase):

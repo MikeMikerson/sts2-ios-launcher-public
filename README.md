@@ -11,8 +11,8 @@ an unofficial fan project, not made or endorsed by Mega Crit or Valve.
 
 - **Your password goes only to Steam.** You sign in on Steam's own servers, as the Steam app does. The app
   never stores your password, only the sign-in Steam gives back, encrypted on your iPhone.
-- **There is no server of ours.** The app talks only to Steam and Mega Crit, plus a multiplayer relay if your
-  build has one. There are no analytics, ads or tracking, and the game's own crash reporting and stats uploads
+- **There is no server of ours.** The app talks only to Steam and Mega Crit, plus a multiplayer relay if you
+  approve it for an imported mod. There are no analytics, ads or tracking, and the game's own crash reporting and stats uploads
   are taken out.
 - **Nothing happens behind your back.** The game downloads, updates and syncs saves with Steam Cloud only when
   you press the button for it.
@@ -170,19 +170,11 @@ LiveContainer's own folder for the app, apart from an installed copy.
 - **Mods > Import from Files** takes a mod's zip: a resource pack, a code mod, or both. Resource packs that
   contain scripts are refused. A code mod runs with the same access as the app, including your Steam sign-in,
   just as code mods do on a PC, so the app warns you and asks first. Only add mods you trust.
-- **Online co-op** works through QuickMatch, a matchmaking mod built into the app when its release is
-  available, with voice chat when the build has a relay (see [Multiplayer](#multiplayer) below). Until
-  QuickMatch's release is pinned in `tools/dependencies.json`, a fork builds without it, and so without
-  multiplayer; everything else works. The game's own online play needs Steamworks, which does not run on
-  iOS, and LAN play is turned off.
+- **Online co-op** requires an imported multiplayer mod. For [Quick Match](https://github.com/MikeMikerson/sts-mods-quickmatch-workshop/releases), download the iPhone ZIP, import it through **Mods > Import from Files**, and start the game with mods enabled.
 
 ## Game versions
 
-The app has been tested with v0.113.0 from Steam's beta branch, and an iPhone still on v0.111.0 keeps
-playing it as tested. A newer Beta is still offered, marked
-untested, and patched on the iPhone in a tolerant mode; if a change the game needs cannot be made to this
-build, the app tells you then. An untested Stable build is not offered until the app is tested with it. The
-app never updates the game by itself.
+Choose a Stable or Beta build from Steam. For a game version without a tested profile, the app downloads its code first and checks that the launcher can run it. If the check fails, your installed game stays in place. Updates start only when you choose to download them.
 
 ## Troubleshooting
 
@@ -200,7 +192,7 @@ app never updates the game by itself.
 - **"This checkout is validated with Xcode 27.2"**: install that version, or point to it with
   `DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer ./setup.sh --install`.
 - **A tool download fails**: run the command again.
-- **Steam's Stable version is not offered**: choose the Beta if Steam has one, or wait for an update of this
+- **A game version fails its compatibility check**: choose the Beta if Steam has one, or wait for an update of this
   app. Nothing is downloaded or deleted.
 - **Steam Guard**: use the code from the Steam app or Steam's email. The QR sign-in needs the Steam app on
   another device.
@@ -227,7 +219,7 @@ This section is for anyone who wants to check the claims above. Each point names
   and Steam name, and need no connection (`src/STS2Mobile.Launcher/SteamLoginSession.cs`). A sign-in stored
   by an older version of the app has no Steam ID yet, so its next Play checks with Steam once. Signing out
   ends this, and so does a later check that finds the account no longer owns the game. Offline, Cloud saves
-  and Game version say that Steam could not be reached, and QuickMatch cannot find or host a match. The one
+  and Game version say that Steam could not be reached, and mods cannot find or host Steam lobbies. The one
   wait is the first Play on an iPhone with no saves yet, which still offers your Steam Cloud saves: offline,
   that gives up after about 15 seconds and the game starts.
 - **Steam account > Sign out** signs out of Steam on this iPhone: it deletes the stored sign-in and its key,
@@ -248,7 +240,7 @@ and refuses IP addresses, redirects, proxies, cookies and overridden Host header
   Send may still remove a cloud file the iPhone no longer has (such as a finished run's save), through Steam's
   own cloud API over the signed-in connection, never through the storage hosts.
 - **Mega Crit's and Steam's websites**, for the game's own web requests.
-- **A QuickMatch relay**, only if the build has one, only during a match (below).
+- **A mod relay**, after you approve the host named by the imported mod.
 
 Nothing else. [NETWORK.md](NETWORK.md) lists each rule and the allowed hosts.
 
@@ -266,15 +258,9 @@ The app's own log (`Documents/full-game-startup.log`) stays on the iPhone and is
 
 ### Multiplayer
 
-- QuickMatch finds and hosts matches through Steam lobbies, over your signed-in Steam connection.
-- **Relay.** The person who builds the app chooses whether to use one: `QUICKMATCH_RELAY=wss://<host>
-  ./setup.sh --install`, or a `.local/QuickMatchRelay.cfg` file with `relay = https://<host>`. Without one,
-  matches use Steam lobby chat (slower, no voice). With one, the app connects to that one host only during a
-  match, and sends QuickMatch's encrypted game messages to the other players. Your Steam sign-in never goes
-  there; the relay sees your IP address, Steam ID and the timing and size of messages.
-- **Microphone.** Used only for QuickMatch's voice chat. iOS asks the first time you turn your mic on in a
-  match, never at launch. It records only while the mic is on, and the voice goes encrypted to the players in
-  that match over the relay. A build without QuickMatch never asks for the microphone.
+- Mods can find, host and join lobbies and exchange lobby chat through your signed-in Steam account.
+- Before a mod connects to its configured relay, the launcher asks you to approve the mod and host. A change of host needs fresh approval. The relay sees your IP address and the data the mod sends.
+- A mod can request microphone access for voice chat. iOS manages the microphone permission for the app.
 
 ### Files and mods
 

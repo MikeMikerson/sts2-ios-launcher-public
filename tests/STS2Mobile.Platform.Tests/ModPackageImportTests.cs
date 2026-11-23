@@ -1,4 +1,7 @@
 using System.IO.Compression;
+using System.Reflection;
+using System.Reflection.Emit;
+using STS2Mobile.ModApi;
 using System.Text;
 
 namespace STS2Mobile.Platform.Tests;
@@ -6,6 +9,12 @@ namespace STS2Mobile.Platform.Tests;
 public sealed class ModPackageImportTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("package-import-").FullName;
+    private sealed class Permissions : Dictionary<string, string>, IRelayPermissions
+    {
+        public string? Read(string id) => this.GetValueOrDefault(id);
+        public void Write(string id, string decision) => this[id] = decision;
+    }
+    private readonly Permissions _permissions = new();
     private string Inputs => Path.Combine(_root, "inputs");
     public void Dispose() => Directory.Delete(_root, true);
     private string Zip(params (string Name, byte[] Bytes)[] files)
@@ -52,6 +61,75 @@ public sealed class ModPackageImportTests : IDisposable
         Assert.Equal(ModImportStatus.Refused, Import(bad, true).Status);
         Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(Path.Combine(Inputs, "Mod", "Mod.dll")));
         Assert.Single(Directory.GetDirectories(Inputs));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RelayChoiceFollowsTheInstalledModAndItsHost(bool allow)
+    {
+        string Package(string id, string host) => Zip((id + ".json", Manifest(id)), (id + ".dll", [1]),
+            (id + ".cfg", Encoding.UTF8.GetBytes("relay = wss://" + host)));
+        string archive = Package("Mod", "relay.example.test");
+        var prompts = new List<string>();
+        Task<bool> Ask(ModImportResult question)
+        {
+            if (question.Status != ModImportStatus.NeedsRelayConfirmation) return Task.FromResult(true);
+            prompts.Add(question.RelayHost!);
+            Assert.Contains(question.RelayHost!, question.Message);
+            return Task.FromResult(allow);
+        }
+        Assert.Equal(ModImportStatus.Installed, (await PickedModImport.InstallAsync(archive, Inputs, Ask, _permissions))?.Status);
+        Assert.Equal(allow ? "relay.example.test" : null, RelaySettings.ApprovedHost(Inputs, "Mod", _permissions));
+        await PickedModImport.InstallAsync(archive, Inputs, Ask, _permissions);
+        Assert.Single(prompts);
+        await PickedModImport.InstallAsync(Package("Other", "relay.example.test"), Inputs, Ask, _permissions);
+        await PickedModImport.InstallAsync(Package("Mod", "new.example.test"), Inputs, Ask, _permissions);
+        Assert.Equal(new[] { "relay.example.test", "relay.example.test", "new.example.test" }, prompts);
+        File.WriteAllText(Path.Combine(Inputs, "Mod", "Mod.cfg"), "relay = wss://another.example.test");
+        Assert.Null(RelaySettings.ApprovedHost(Inputs, "Mod", _permissions));
+    }
+
+    [Fact]
+    public void OnlyTheApprovedCallingAssemblyReceivesItsRelay()
+    {
+        Func<IRelayTransport?> ModCaller(string id)
+        {
+            var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName(id), AssemblyBuilderAccess.Run);
+            var type = assembly.DefineDynamicModule(id).DefineType("Caller", TypeAttributes.Public);
+            var method = type.DefineMethod("Get", MethodAttributes.Public | MethodAttributes.Static, typeof(IRelayTransport), Type.EmptyTypes);
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Call, typeof(Multiplayer).GetMethod(nameof(Multiplayer.GetRelay))!);
+            il.Emit(OpCodes.Ret);
+            return type.CreateType()!.GetMethod("Get")!.CreateDelegate<Func<IRelayTransport?>>();
+        }
+        var approved = ModCaller("AllowedMod");
+        var denied = ModCaller("DeniedMod");
+        foreach (string id in new[] { "AllowedMod", "DeniedMod" })
+        {
+            var archive = Zip((id + ".json", Manifest(id)), (id + ".dll", [1]), (id + ".cfg", "relay = wss://relay.example.test"u8.ToArray()));
+            Assert.Equal(ModImportStatus.Installed,
+                ModPackageImport.Install(archive, Inputs, false, true, new RelayDecision(id, "relay.example.test", id == "AllowedMod"), _permissions).Status);
+        }
+        PhoneRelayConnector.Register(Inputs, [approved.Method.Module.Assembly, denied.Method.Module.Assembly], _permissions);
+        try
+        {
+            Assert.NotNull(approved());
+            Assert.Null(denied());
+            Assert.Null(Multiplayer.GetRelay());
+        }
+        finally { PhoneRelayConnector.Register(Inputs, [], _permissions); }
+    }
+
+    [Fact]
+    public void ImportedFilesCannotGrantRelayApproval()
+    {
+        var archive = Zip(("Mod.json", Manifest("Mod")), ("Mod.dll", [1]), (".relay-decision", "+relay.example.test"u8.ToArray()));
+        Assert.Equal(ModImportStatus.Refused, Import(archive).Status);
+        archive = Zip(("Mod.json", Manifest("Mod")), ("Mod.dll", [1]), ("Mod.cfg", "relay = wss://relay.example.test"u8.ToArray()));
+        foreach (var decision in new[] { new RelayDecision("Other", "relay.example.test", true), new RelayDecision("Mod", "other.example.test", true) })
+            Assert.Equal(ModImportStatus.NeedsRelayConfirmation, ModPackageImport.Install(archive, Inputs, false, true, decision, _permissions).Status);
+        Assert.Null(RelaySettings.ApprovedHost(Inputs, "Mod", _permissions));
     }
 
     [Fact]

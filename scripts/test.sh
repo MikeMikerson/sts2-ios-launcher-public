@@ -14,6 +14,8 @@ if ! "$python" -m unittest discover -s tests -p 'test_*.py' > .work/logs/python-
     echo 'Python tests failed. See .work/logs/python-tests.log' >&2
     exit 1
 fi
+# The list the patcher embeds is the one the host's current sources make.
+scripts/list-game-references.sh --check
 for project in STS2Mobile.Steam.Tests STS2Mobile.Platform.Tests ModWeaver.Tests GamePatcher.Tests GamePack.Tests; do
     log=".work/logs/$project.log"
     if ! dotnet test "tests/$project" > "$log" 2>&1; then

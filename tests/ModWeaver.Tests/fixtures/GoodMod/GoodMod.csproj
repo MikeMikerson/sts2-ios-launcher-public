@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../../src/STS2Mobile.ModApi/STS2Mobile.ModApi.csproj" Private="false" />
     <ProjectReference Include="../FakeGame/FakeGame.csproj" />
     <ProjectReference Include="../FakeHarmony/FakeHarmony.csproj" />
   </ItemGroup>

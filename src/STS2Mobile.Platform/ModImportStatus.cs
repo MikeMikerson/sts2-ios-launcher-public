@@ -1,3 +1,3 @@
 namespace STS2Mobile.Platform;
 
-public enum ModImportStatus { Installed, NeedsCodeConfirmation, NeedsReplaceConfirmation, Refused }
+public enum ModImportStatus { Installed, NeedsCodeConfirmation, NeedsReplaceConfirmation, NeedsRelayConfirmation, Refused }

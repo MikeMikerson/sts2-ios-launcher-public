@@ -256,6 +256,7 @@ public sealed class GameAssemblyPreparationTests : IDisposable
         PreparationResult Prepare(string pins) => new GameAssemblyPreparation(_game, _profile, Patcher, (_, work) =>
         {
             _builds++;
+            if (pins != "no-mods") File.WriteAllText(Path.Combine(work, "Example.dll"), pins);
             File.WriteAllText(Path.Combine(work, "sts2.dll"), "woven:" + pins);
             File.WriteAllText(Path.Combine(work, "sts2.unmodded.dll"), "plain");
             File.WriteAllText(Path.Combine(work, GameFolder.ModCatalog), pins);
@@ -268,7 +269,9 @@ public sealed class GameAssemblyPreparationTests : IDisposable
         Assert.Equal("woven:mod-v2", File.ReadAllText(Output));
         Assert.Equal("plain", File.ReadAllText(Path.Combine(_game, "sts2.unmodded.dll")));
         Assert.Equal("mod-v2", File.ReadAllText(Path.Combine(_game, GameFolder.ModCatalog)));
+        Assert.True(File.Exists(Path.Combine(_game, "Example.dll")));
         Assert.Equal(PreparationStatus.Prepared, Prepare("no-mods").Status);
+        Assert.False(File.Exists(Path.Combine(_game, "Example.dll")));
         Assert.Equal(3, _builds);
     }
 

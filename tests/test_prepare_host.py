@@ -56,15 +56,6 @@ class BuiltInModTests(unittest.TestCase):
             catalog.write_text(json.dumps(data))
             self.assertEqual(game_files.built_in_mods(catalog), [])
 
-    def test_the_catalog_pins_match_the_dependency_pins(self):
-        catalog = json.loads((ROOT / "mods/builtin.json").read_text())
-        pins = json.loads((ROOT / "tools/dependencies.json").read_text())["builtin_mods"]
-        for entry in catalog["mods"]:
-            files = pins[entry["id"]]["files"]
-            self.assertEqual(files[f"{entry['id']}.dll"]["sha256"], entry["dllSha256"])
-            self.assertEqual(files[f"{entry['id']}.json"]["sha256"], entry["manifestSha256"])
-            self.assertEqual(entry["dll"], f".tools/builtin-mods/{entry['id']}.dll")
-
     def test_a_mod_that_differs_from_its_catalog_stops(self):
         with tempfile.TemporaryDirectory() as directory:
             catalog = self.catalog(Path(directory), b"mod", b"other")

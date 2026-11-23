@@ -15,15 +15,20 @@ public enum GameVersionProblem
     /// <summary>The download and preparation cannot fit.</summary>
     NotEnoughSpace,
     /// <summary>
-    /// Steam's Stable is a build this app has not been tested with. The host code is built against one game version, and an older Stable did
-    /// not start, so Stable is offered only once its build is tested. An untested Beta is still offered.
+    /// The build's code, fetched alone and checked before the rest of it, lacks a change the game cannot run without or a member the
+    /// app's code uses: <see cref="GameVersionCheck.Reason"/> says which. Stable or Beta, tested or not, a build is offered only when this passes.
     /// </summary>
-    UntestedStable,
+    CannotRun,
 }
 
 /// <summary>Whether one version can be downloaded, decided before anything is touched.</summary>
 /// <param name="Profile">The tested version's profile, or null for a build this app has not tested, which is patched on the phone in tolerant mode.</param>
-public sealed record GameVersionCheck(GameVersionProblem Problem, BranchBuild? Build, GameProfile? Profile, long RequiredBytes = 0, long AvailableBytes = 0)
+/// <param name="Reason">For <see cref="GameVersionProblem.CannotRun"/>, why, as the end of a sentence.</param>
+/// <param name="Skipped">For an untested build whose code was checked, the changes it plays without.</param>
+/// <param name="CodeChecked">An untested build's code was fetched and checked (<see cref="GameInstaller.CheckCodeAsync"/>).</param>
+/// <param name="LeftOut">For a build whose code was checked, the optional built-in mods its game would start without.</param>
+public sealed record GameVersionCheck(GameVersionProblem Problem, BranchBuild? Build, GameProfile? Profile, long RequiredBytes = 0, long AvailableBytes = 0,
+    string? Reason = null, IReadOnlyList<string>? Skipped = null, bool CodeChecked = false, IReadOnlyList<ModLeftOut>? LeftOut = null)
 {
     public bool Tested => Profile != null;
 }
@@ -46,12 +51,16 @@ public sealed class GameInstaller(string gameFolder, IReadOnlyList<GameProfile> 
     public const string NormalBranch = InstalledBuild.NormalBranch;
     public const string BetaBranch = InstalledBuild.BetaBranch;
     public const string RecordSuffix = ".download.json";
+    /// <summary>Beside the game folder: one folder per manifest whose code was fetched to check it before the rest.</summary>
+    public const string CheckSuffix = ".check";
     /// <summary>
     /// What setup needs beyond the downloaded files, for each byte of Steam's pack: the converted textures and the game's pack sit beside it
     /// until it goes. At its fullest, setup measured about 1.48 times the pack's size.
     /// </summary>
     private const double PackOverhead = 1.5;
     private string RecordPath => gameFolder.TrimEnd(Path.DirectorySeparatorChar) + RecordSuffix;
+    private string CheckRoot => gameFolder.TrimEnd(Path.DirectorySeparatorChar) + CheckSuffix;
+    private string CheckFolder(ulong manifest) => Path.Combine(CheckRoot, manifest.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>Whether the game folder holds anything, finished or not, that replacing it would delete.</summary>
     public bool HasGameFiles => Directory.Exists(gameFolder) && Directory.EnumerateFileSystemEntries(gameFolder).Any();
@@ -79,16 +88,64 @@ public sealed class GameInstaller(string gameFolder, IReadOnlyList<GameProfile> 
         }
     }
 
-    /// <summary>Steam's answer for a version, and whether this app has tested it. The space check needs the version's file list: see <see cref="CheckSpace"/>.</summary>
-    public GameVersionCheck Check(BranchBuild? build)
+    /// <summary>
+    /// Steam's answer for a version, and whether this app has tested it. Any build Steam serves on either branch is a candidate: an
+    /// untested one's code is checked next (<see cref="CheckCodeAsync"/>), and the space check needs its file list (<see cref="CheckSpace"/>).
+    /// </summary>
+    public GameVersionCheck Check(BranchBuild? build) =>
+        build == null ? new GameVersionCheck(GameVersionProblem.NotOnSteam, null, null) : new GameVersionCheck(GameVersionProblem.None, build, ProfileFor(build.ManifestId));
+
+    /// <summary>
+    /// The plan's files the patches read (<c>sts2.dll</c> and the reporting SDK's, about 10 MB), fetched to a folder beside the game instead, so the
+    /// game on this iPhone stays as it is while they are checked.
+    /// </summary>
+    public IReadOnlyList<DepotFile> CodePlan(ulong manifest, IReadOnlyList<DepotFile> plan)
     {
-        if (build == null) return new GameVersionCheck(GameVersionProblem.NotOnSteam, null, null);
-        var profile = ProfileFor(build.ManifestId);
-        return new GameVersionCheck(IsOffered(build, profile) ? GameVersionProblem.None : GameVersionProblem.UntestedStable, build, profile);
+        string original = Path.Combine(gameFolder, GameFolder.Original) + Path.DirectorySeparatorChar;
+        return plan.Where(file => file.Path.StartsWith(original, StringComparison.Ordinal) && file.Path.EndsWith(".dll", StringComparison.Ordinal))
+            .Select(file => file with { Path = Path.Combine(CheckFolder(manifest), Path.GetRelativePath(gameFolder, file.Path)) }).ToList();
     }
 
-    /// <summary>Whether this build may be downloaded at all: any Beta, and a Stable only when it is tested (see <see cref="GameVersionProblem.UntestedStable"/>).</summary>
-    public static bool IsOffered(BranchBuild build, GameProfile? profile) => profile != null || build.Branch != NormalBranch;
+    /// <summary>
+    /// For an untested build: fetches its code alone (<see cref="CodePlan"/>) and checks it with <paramref name="checkCode"/>, which is given the
+    /// folder that stands for <see cref="GameFolder.Original"/>. A build that cannot run comes back as
+    /// <see cref="GameVersionProblem.CannotRun"/> with its files gone again, and nothing else was downloaded or deleted. A tested build, or one
+    /// with another problem, comes back as it was.
+    /// </summary>
+    public async Task<GameVersionCheck> CheckCodeAsync(GameVersionCheck check, IReadOnlyList<DepotFile> plan, IDepotChunkSource source, Func<string, Task<CodeCheck>> checkCode,
+        CancellationToken cancellationToken)
+    {
+        if (check.Problem != GameVersionProblem.None || check.Tested) return check;
+        ulong manifest = check.Build!.ManifestId;
+        string folder = CheckFolder(manifest);
+        // Another build's files would answer for this one's (a reporting assembly this build lacks), so each check starts empty.
+        if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        Directory.CreateDirectory(folder);
+        excludeFromBackup?.Invoke(CheckRoot);
+        await new DepotDownload(source, CodePlan(manifest, plan)).RunAsync(cancellationToken).ConfigureAwait(false);
+        var result = await checkCode(Path.Combine(folder, GameFolder.Original)).ConfigureAwait(false);
+        if (result.Reason == null) return check with { Skipped = result.Skipped, CodeChecked = true, LeftOut = result.LeftOut ?? [] };
+        Directory.Delete(folder, recursive: true);
+        return check with { Problem = GameVersionProblem.CannotRun, Reason = result.Reason, CodeChecked = true };
+    }
+
+    /// <summary>After <see cref="Begin"/>: the checked code goes where the download puts it, which then finds it finished, and the rest of the checks go.</summary>
+    public void TakeCheckedCode(ulong manifest, IReadOnlyList<DepotFile> plan)
+    {
+        foreach (var file in plan)
+            if (CodePlan(manifest, [file]) is [var checkedFile] && File.Exists(checkedFile.Path))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file.Path)!);
+                File.Move(checkedFile.Path, file.Path, overwrite: true);
+            }
+        DeleteCheckedCode();
+    }
+
+    /// <summary>Deletes whatever code was fetched to be checked. Nothing else depends on it.</summary>
+    public void DeleteCheckedCode()
+    {
+        if (Directory.Exists(CheckRoot)) Directory.Delete(CheckRoot, recursive: true);
+    }
 
     /// <summary>The same for a download already under way: Steam's answer for its branch no longer matters, because the player chose this one.</summary>
     public GameVersionCheck CheckPending(PendingGameDownload pending) =>
@@ -185,6 +242,7 @@ public sealed class GameInstaller(string gameFolder, IReadOnlyList<GameProfile> 
     {
         WriteRecord(new PendingGameDownload("", 0, false));
         if (Directory.Exists(gameFolder)) Directory.Delete(gameFolder, recursive: true);
+        DeleteCheckedCode();
         File.Delete(RecordPath);
     }
 

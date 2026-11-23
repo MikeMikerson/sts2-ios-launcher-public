@@ -18,6 +18,7 @@ public sealed class GameProfileTests
 
     [Theory]
     [InlineData("adapters/STS2Mobile.Platform.dll")]
+    [InlineData("adapters/STS2Mobile.ModApi.dll")]
     [InlineData("adapters/STS2Mobile.GameAdapters.dll")]
     public void AdaptersNameTheFrameworkVersionTheGameDoes(string resource)
     {
@@ -27,13 +28,6 @@ public sealed class GameProfileTests
         data.Position = 0;
         using var module = ModuleDefinition.ReadModule(data);
         Assert.Equal(9, module.AssemblyReferences.Single(r => r.Name == "System.Runtime").Version.Major);
-    }
-
-    [Fact]
-    public void TheAppLooksForModsInTheOriginalFolder()
-    {
-        // QuickMatch is the one built-in mod, and optional: a build without its files has none.
-        Assert.Empty(BuiltInModInput.InOriginalFolder("/original", """{"mods":[{"id":"QuickMatch","optional":true,"dllSha256":"d","manifestSha256":"m"}]}""", _ => null));
     }
 
     [Fact]

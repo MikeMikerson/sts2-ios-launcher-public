@@ -9,10 +9,13 @@ public static class GameInstallMessages
     public const string Kept = "Your saves and Steam sign-in stay on this iPhone.";
     public const string ChooseVersion = "Which version of the game do you want?\nSteam's normal version (Stable), or its beta. Saves do not always move between them.";
     public const string Untested = "This build has not been tested with this app. The app patches it on this iPhone after the download, and if a change the game needs cannot be made to this build, it tells you then.";
+    public const string UntestedChecked = "This build has not been tested with this app, but its code was checked first: every change the game needs fits it, and it has everything the app's code uses.";
     public const string BetaToStable = "Saves made in the beta may not open in Stable.";
     private const double Gigabyte = 1_000_000_000;
 
     public static string Gb(long bytes) => string.Create(CultureInfo.InvariantCulture, $"{bytes / Gigabyte:0.0} GB");
+
+    public static string Mb(long bytes) => string.Create(CultureInfo.InvariantCulture, $"{Math.Max(1, bytes / 1_000_000)} MB");
 
     /// <summary>The branch as the player knows it: Stable or Beta.</summary>
     public static string Name(string branch) => branch == GameInstaller.BetaBranch ? "Beta" : "Stable";
@@ -26,13 +29,14 @@ public static class GameInstallMessages
     public static string Problem(GameVersionCheck check, string name) => check.Problem switch
     {
         GameVersionProblem.NotEnoughSpace => $"The {name} version needs {Gb(check.RequiredBytes)} free and this iPhone has {Gb(check.AvailableBytes)}, so nothing was downloaded or deleted.\nFree up some space and try again.",
-        GameVersionProblem.UntestedStable => $"{NotOfferedYet(check)} Nothing was downloaded or deleted.",
+        GameVersionProblem.CannotRun => $"{CannotRun(check, name)} Only its code was fetched to check that, and nothing else was downloaded or deleted.",
         _ => $"Steam has no {name} version for this account, so nothing was downloaded or deleted.",
     };
 
     /// <summary>The same for neither version, which leaves the player nothing to choose.</summary>
     public static string NeitherUsable(GameVersionCheck normal, GameVersionCheck beta) =>
-        Short(normal, "Stable") + "\n" + Short(beta, "Beta") + "\nNothing was downloaded or deleted.";
+        Short(normal, "Stable") + "\n" + Short(beta, "Beta") + "\n"
+        + (normal.CodeChecked || beta.CodeChecked ? "Only code was fetched for the check, and nothing else was downloaded or deleted." : "Nothing was downloaded or deleted.");
 
     /// <summary>Asked before anything is deleted or fetched.</summary>
     /// <param name="installed">The game on this iPhone, when this replaces it; null when there is none, or only part of a download.</param>
@@ -49,7 +53,8 @@ public static class GameInstallMessages
         if (IsSwitch(installed, check.Build.Branch))
             lines.Add((installed!.Branch == GameInstaller.BetaBranch && check.Build.Branch == GameInstaller.NormalBranch ? BetaToStable + " " : "")
                 + "Your saves are copied to a backup before anything is deleted.");
-        if (!check.Tested) lines.Add(Untested);
+        if (!check.Tested) lines.Add(UntestedNote(check));
+        if (LeftOutNote(check) is { } leftOut) lines.Add(leftOut);
         lines.Add($"Setting it up needs {Gb(check.RequiredBytes)} free for a while. {Kept}");
         return string.Join("\n", lines);
     }
@@ -88,6 +93,10 @@ public static class GameInstallMessages
     public static string BackupFailed(Exception error) =>
         $"Your saves could not be copied to a backup ({error.GetType().Name}), so nothing was downloaded or deleted.\nFree up some space and try again.";
 
+    /// <summary>While an untested build's code is fetched and checked, before the choice or the confirmation.</summary>
+    public static string CheckingCode(string name, long codeBytes) =>
+        $"Checking Steam's {name} version with this app.\nOnly its code comes first ({Mb(codeBytes)}), to see that it runs before the whole game is downloaded.";
+
     public static string Progress(int percent, long doneBytes, long totalBytes) =>
         $"Downloading the game: {percent}%, {Gb(doneBytes)} of {Gb(totalBytes)}.\nIf you leave this app, it carries on from here when you come back.";
 
@@ -112,13 +121,23 @@ public static class GameInstallMessages
     private static bool IsNetwork(Exception error) =>
         error is HttpRequestException or TimeoutException or System.Net.Sockets.SocketException or OperationCanceledException or SteamKit2.AsyncJobFailedException;
 
-    private static string NotOfferedYet(GameVersionCheck check) =>
-        $"Steam's Stable version ({Describe(check)}) does not run with this app yet, so it is not offered until the app is tested with it.";
+    /// <summary>What the confirmation says about an untested build: checked before the download when it was, and what it plays without.</summary>
+    public static string UntestedNote(GameVersionCheck check) => !check.CodeChecked ? Untested
+        : check.Skipped is { Count: > 0 } skipped
+            ? $"This build has not been tested with this app, but its code was checked first: it runs, and plays without: {string.Join("; ", skipped)}."
+            : UntestedChecked;
+
+    /// <summary>The built-in mods the game would start without on this build, each with why, or null when it fits them all.</summary>
+    public static string? LeftOutNote(GameVersionCheck check) => check.LeftOut is { Count: > 0 } mods
+        ? string.Join("\n", mods.Select(mod => $"{mod.Name} does not fit this build, so the game would start without it: {mod.Reason}."))
+        : null;
+
+    private static string CannotRun(GameVersionCheck check, string name) => $"Steam's {name} version ({Describe(check)}) cannot run with this app: {check.Reason}.";
 
     private static string Short(GameVersionCheck check, string name) => check.Problem switch
     {
         GameVersionProblem.NotEnoughSpace => $"The {name} version needs {Gb(check.RequiredBytes)} free and this iPhone has {Gb(check.AvailableBytes)}.",
-        GameVersionProblem.UntestedStable => NotOfferedYet(check),
+        GameVersionProblem.CannotRun => CannotRun(check, name),
         _ => $"Steam has no {name} version for this account.",
     };
 }

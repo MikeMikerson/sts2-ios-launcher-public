@@ -1,15 +1,17 @@
 namespace STS2Mobile.Platform;
 
-/// <summary>
-/// QuickMatch's relay host, read from the <c>QuickMatchRelay.cfg</c> built into the app. Whoever builds the app chooses it
-/// (<c>QUICKMATCH_RELAY</c> or <c>.local/QuickMatchRelay.cfg</c> when running setup); it is never in a tracked file. The file uses the desktop companion's format: <c>key = value</c> lines and <c>#</c> comments,
-/// with <c>relay = https://host</c> (or <c>wss://host</c>) and <c>enabled = true|false</c>. Unlike the companion there is no
-/// built-in default: no file, no <c>relay</c> line, <c>enabled = false</c> or any problem in the file means no relay, and
-/// QuickMatch keeps to lobby chat. The address is a host name on port 443 and nothing else.
-/// </summary>
+/// <summary>The host in an imported mod's optional &lt;id&gt;.cfg file.</summary>
 public static class RelaySettings
 {
-    public const string FileName = "QuickMatchRelay.cfg";
+    internal static string? ApprovedHost(string inputsDirectory, string id, IRelayPermissions permissions)
+    {
+        if (!ModFiles.IsValidId(id)) return null;
+        string folder = Path.Combine(inputsDirectory, id);
+        string cfg = Path.Combine(folder, id + ".cfg");
+        if (!File.Exists(cfg)) return null;
+        string? host = ParseHost(File.ReadAllText(cfg), _ => { });
+        return host != null && permissions.Read(id) == "+" + host ? host : null;
+    }
 
     /// <summary>The relay host the file names, or null for none; each problem goes to <paramref name="problem"/>.</summary>
     public static string? ParseHost(string? text, Action<string> problem)
@@ -26,7 +28,7 @@ public static class RelaySettings
             int equals = line.IndexOf('=');
             if (equals <= 0)
             {
-                problem($"{FileName} line {number}: expected key = value");
+                problem($"Relay config line {number}: expected key = value");
                 broken = true;
                 continue;
             }
@@ -34,7 +36,7 @@ public static class RelaySettings
             string value = line[(equals + 1)..].Trim();
             if (!seen.Add(key))
             {
-                problem($"{FileName} line {number}: {key} is set twice");
+                problem($"Relay config line {number}: {key} is set twice");
                 broken = true;
                 continue;
             }
@@ -46,16 +48,16 @@ public static class RelaySettings
                     enabled = false;
                     break;
                 case "enabled":
-                    problem($"{FileName} line {number}: enabled is true or false, not \"{value}\"");
+                    problem($"Relay config line {number}: enabled is true or false, not \"{value}\"");
                     broken = true;
                     break;
                 case "relay":
                     if (TryParseHost(value, out host, out string? why)) break;
-                    problem($"{FileName} line {number}: relay address {why}");
+                    problem($"Relay config line {number}: relay address {why}");
                     broken = true;
                     break;
                 default:
-                    problem($"{FileName} line {number}: unknown setting \"{key}\" (known: enabled, relay)");
+                    problem($"Relay config line {number}: unknown setting \"{key}\" (known: enabled, relay)");
                     broken = true;
                     break;
             }

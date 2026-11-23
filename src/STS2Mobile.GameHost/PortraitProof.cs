@@ -814,7 +814,7 @@ internal static partial class PortraitProof
         GD.Print($"Portrait proof step ack timeout: {step}");
     }
 
-    private static async Task DismissEarlyAccessIfPresentAsync(SceneTree tree)
+    internal static async Task DismissEarlyAccessIfPresentAsync(SceneTree tree)
     {
         await WaitFramesAsync(tree, 15);
         Node? disclaimer = Descendants(tree.Root).FirstOrDefault(n =>

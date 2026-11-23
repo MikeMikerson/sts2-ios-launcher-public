@@ -7,6 +7,9 @@
       },
       "sts2": {
         "type": "Project"
+      },
+      "sts2mobile.modapi": {
+        "type": "Project"
       }
     }
   }

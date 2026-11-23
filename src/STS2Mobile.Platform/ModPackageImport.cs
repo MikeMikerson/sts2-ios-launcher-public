@@ -16,7 +16,11 @@ public static class ModPackageImport
 
     /// <summary>Checks and stores a mod's zip. A mod with code needs <paramref name="codeConfirmed"/>, and one that replaces
     /// an installed mod needs <paramref name="replaceConfirmed"/>; each missing answer returns its question instead.</summary>
-    public static ModImportResult Install(string archivePath, string inputsDirectory, bool replaceConfirmed, bool codeConfirmed)
+    public static ModImportResult Install(string archivePath, string inputsDirectory, bool replaceConfirmed, bool codeConfirmed) =>
+        Install(archivePath, inputsDirectory, replaceConfirmed, codeConfirmed, null, RelayPermissions.Device);
+
+    internal static ModImportResult Install(string archivePath, string inputsDirectory, bool replaceConfirmed, bool codeConfirmed,
+        RelayDecision? relayDecision, IRelayPermissions permissions)
     {
         string? incoming = null;
         try
@@ -52,8 +56,8 @@ public static class ModPackageImport
             {
                 string name = Path.GetFileName(path);
                 if (Path.GetExtension(name).ToLowerInvariant() is ".md" or ".txt" or ".pdb") continue;
-                if ((Path.GetDirectoryName(path) ?? "") != parent || name != id + ".json" && !(hasDll && name == id + ".dll") && !(hasPack && name == id + ".pck"))
-                    throw new InvalidDataException($"Unexpected file {path}: only the declared manifest, DLL and pack are supported.");
+                if ((Path.GetDirectoryName(path) ?? "") != parent || name != id + ".json" && !(hasDll && name == id + ".dll") && !(hasPack && name == id + ".pck") && !(hasDll && name == id + ".cfg"))
+                    throw new InvalidDataException($"Unexpected file {path}: expected the declared manifest, DLL, pack or matching relay config.");
                 content.Add(name, entry);
             }
             if (hasDll && !content.ContainsKey(id + ".dll")) throw new InvalidDataException($"The manifest declares code, but {id}.dll is missing.");
@@ -67,6 +71,26 @@ public static class ModPackageImport
                 return new(ModImportStatus.NeedsCodeConfirmation, id, CodeWarning(id));
             if (Directory.Exists(target) && !replaceConfirmed)
                 return new(ModImportStatus.NeedsReplaceConfirmation, id, $"A mod named {id} is already installed. Replace it?");
+            string? decision = null;
+            if (content.TryGetValue(id + ".cfg", out var config))
+            {
+                if (config.Length > 65536) throw new InvalidDataException("The relay config is too large.");
+                using var reader = new StreamReader(config.Open(), Encoding.UTF8);
+                var problems = new List<string>();
+                string? host = RelaySettings.ParseHost(reader.ReadToEnd(), problems.Add);
+                if (problems.Count > 0) throw new InvalidDataException(problems[0]);
+                if (host != null)
+                {
+                    string? previous = permissions.Read(id);
+                    if (previous != "+" + host && previous != "-" + host)
+                    {
+                        if (relayDecision?.ModId != id || relayDecision.Host != host)
+                            return new(ModImportStatus.NeedsRelayConfirmation, id,
+                                $"Allow {id} to connect to {host} for multiplayer? You can add the mod with its relay turned off.", host);
+                        decision = (relayDecision.Allow ? "+" : "-") + host;
+                    }
+                }
+            }
             incoming = Path.Combine(inputsDirectory, ".incoming-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(incoming);
             foreach (var (name, entry) in content) entry.ExtractToFile(Path.Combine(incoming, name));
@@ -74,6 +98,7 @@ public static class ModPackageImport
                 ? ModPackPreparation.Prepare(Path.Combine(incoming, id + ".pck"), Path.Combine(incoming, "prepared.pck")) : [];
             // Move the old folder aside so a failed publication can restore it.
             string backup = Path.Combine(inputsDirectory, ".previous-" + id);
+            if (decision != null) permissions.Write(id, decision);
             bool replacing = Directory.Exists(target);
             if (replacing) Directory.Move(target, backup);
             try { Directory.Move(incoming, target); }

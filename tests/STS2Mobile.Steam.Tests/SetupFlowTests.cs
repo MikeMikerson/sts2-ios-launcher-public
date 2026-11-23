@@ -94,13 +94,56 @@ public sealed class SetupFlowTests
     }
 
     [Fact]
-    public void AnUntestedStableIsSaidNotToRunYetBesideTheBeta()
+    public void AStableWhoseCodeCannotRunIsSaidSoBesideTheBeta()
     {
-        var other = new GameVersionCheck(GameVersionProblem.UntestedStable, Normal, null);
+        var other = new GameVersionCheck(GameVersionProblem.CannotRun, Normal, null, Reason: "it lacks Game.Thing::Count System.Int32, which the app's code uses", CodeChecked: true);
 
         string question = GameInstallMessages.Confirm(BetaTested, 1, replacesGame: false, null, other, "Stable");
 
-        Assert.Contains("Steam's Stable version (build 23811903, untested) does not run with this app yet", question);
+        Assert.Contains("Steam's Stable version (build 23811903, untested) cannot run with this app: it lacks Game.Thing::Count System.Int32", question);
+    }
+
+    [Fact]
+    public void NeitherVersionRunningSaysOnlyCodeWasFetched()
+    {
+        var normal = new GameVersionCheck(GameVersionProblem.CannotRun, Normal, null, Reason: "it lacks A", CodeChecked: true);
+        string message = GameInstallMessages.NeitherUsable(normal, new GameVersionCheck(GameVersionProblem.NotOnSteam, null, null));
+
+        Assert.Contains("Steam's Stable version (build 23811903, untested) cannot run with this app: it lacks A.", message);
+        Assert.Contains("Only code was fetched for the check, and nothing else was downloaded or deleted.", message);
+    }
+
+    [Fact]
+    public void AnUntestedBuildWhoseCodeWasCheckedSaysSoInTheConfirmation()
+    {
+        var check = new GameVersionCheck(GameVersionProblem.None, Normal, null, 4_000_000_000, CodeChecked: true, Skipped: []);
+
+        string question = GameInstallMessages.Confirm(check, 1, replacesGame: false);
+
+        Assert.Contains(GameInstallMessages.UntestedChecked, question);
+        Assert.DoesNotContain(GameInstallMessages.Untested, question);
+    }
+
+    [Fact]
+    public void ABuildThatLeavesOutABuiltInModNamesItInTheConfirmation()
+    {
+        var check = new GameVersionCheck(GameVersionProblem.None, Normal, null, 4_000_000_000, CodeChecked: true, Skipped: [],
+            LeftOut: [new ModLeftOut("ExampleMod", "Example Mod", "ExampleMod.Patches.Example targets ExampleModel, which is not in the game")]);
+
+        string question = GameInstallMessages.Confirm(check, 1, replacesGame: true, BetaInstalled);
+
+        Assert.Contains("\nExample Mod does not fit this build, so the game would start without it: "
+            + "ExampleMod.Patches.Example targets ExampleModel, which is not in the game.\n", question);
+    }
+
+    [Fact]
+    public void ABuildThatFitsEveryBuiltInModSaysNothingNew()
+    {
+        var check = new GameVersionCheck(GameVersionProblem.None, Normal, null, 4_000_000_000, CodeChecked: true, Skipped: [], LeftOut: []);
+
+        Assert.Equal(GameInstallMessages.Confirm(check with { LeftOut = null }, 1, replacesGame: false), GameInstallMessages.Confirm(check, 1, replacesGame: false));
+        Assert.DoesNotContain("start without", GameInstallMessages.Confirm(check, 1, replacesGame: false));
+        Assert.DoesNotContain("start without", GameInstallMessages.Confirm(BetaTested, 1, replacesGame: false));
     }
 
     [Fact]

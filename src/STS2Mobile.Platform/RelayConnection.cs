@@ -3,11 +3,7 @@ using System.Threading.Channels;
 
 namespace STS2Mobile.Platform;
 
-/// <summary>
-/// The one relay the app may reach, for QuickMatch only (NETWORK.md): exactly the host named in QuickMatch's release
-/// (<see cref="RelaySettings"/>), WebSocket over TLS on port 443, the relay's room paths only. Kept apart from the Steam and
-/// game policies, which both refuse it. The host is passed in, not written down here.
-/// </summary>
+/// <summary>Room paths on the relay host the player approved for one imported mod.</summary>
 public sealed class RelayNetworkPolicy
 {
     private const string RoomPath = "/v1/relay/";

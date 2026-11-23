@@ -1,4 +1,4 @@
-namespace STS2Mobile.Platform;
+namespace STS2Mobile.ModApi;
 
 /// <summary>How entering a lobby went, as Steam reports it.</summary>
 public enum LobbyEntry
@@ -29,11 +29,10 @@ public readonly record struct LobbyUpdate(LobbyChange Change, ulong Lobby, ulong
 public readonly record struct FoundLobby(ulong Id, int Members, IReadOnlyDictionary<string, string> Data);
 
 /// <summary>
-/// Steam lobbies and lobby chat on the signed-in connection, without SteamKit2's types, so the
-/// interpreted host can reach them. The launcher binds them in <see cref="RuntimeServices.BindLobbies"/> before the game starts.
+/// Steam lobbies and chat for the signed-in player.
 /// Lobby types use Steam's ELobbyType numbers (0 private, 1 friends only, 2 public, 3 invisible).
 /// </summary>
-public interface IPhoneLobbies
+public interface ISteamLobbies
 {
     ulong LocalId { get; }
 
@@ -67,4 +66,7 @@ public interface IPhoneLobbies
 
     /// <summary>The Steam name of a member of a lobby we are in, or null.</summary>
     string? MemberName(ulong member);
+
+    /// <summary>True when the signed-in account has blocked the player in Steam (an "Ignored" entry in the friends list Steam sends at sign-in).</summary>
+    bool BlockedOnSteam(ulong player);
 }

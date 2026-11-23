@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SteamKit2;
-using STS2Mobile.Platform;
+using STS2Mobile.ModApi;
 using STS2Mobile.Steam;
 using STS2Mobile.Steam.Connection;
 using STS2Mobile.Steam.Lobby;
@@ -12,17 +12,20 @@ using STS2Mobile.Steam.Lobby;
 namespace STS2Mobile.FullGame;
 
 /// <summary>
-/// The lobby service on the signed-in connection, as the host sees it (<see cref="IPhoneLobbies"/>): Steam's lobby types and enter
+/// The lobby service on the signed-in connection, as the host sees it (<see cref="ISteamLobbies"/>): Steam's lobby types and enter
 /// responses become plain numbers and <see cref="LobbyEntry"/>, so the interpreted host needs no SteamKit2 type.
 /// </summary>
 /// <remarks>
 /// <c>STS2_STEAM_DROP_AFTER=&lt;seconds&gt;</c> closes the Steam connection that long after each lobby is entered or created, as a
 /// lost network would, to test what a match does when Steam takes the phone out of its lobby.
 /// </remarks>
-internal sealed class SteamLobbies : IPhoneLobbies, IDisposable
+internal sealed class SteamLobbies : ISteamLobbies, IDisposable
 {
+    private const string Tag = "SteamLobbies";
+
     private readonly SteamLobbyService _lobbies;
     private readonly ILobbyConnection _connection;
+    private readonly IDisposable _friendsList;
     private readonly int _dropAfterSeconds =
         int.TryParse(System.Environment.GetEnvironmentVariable("STS2_STEAM_DROP_AFTER"), out int seconds) && seconds > 0 ? seconds : 0;
 
@@ -31,7 +34,7 @@ internal sealed class SteamLobbies : IPhoneLobbies, IDisposable
         _lobbies = new SteamLobbyService(connection, SteamApp.Id, logger);
         _connection = connection;
         LocalId = localId;
-        // Steam has taken us out: QuickMatch hears it as our own departure, as it would from Steamworks.
+        // A connection loss is a local departure from every lobby we joined.
         _lobbies.LobbiesLost += lost =>
         {
             foreach (ulong lobby in lost) Changed?.Invoke(new LobbyUpdate(LobbyChange.MemberLeft, lobby, LocalId));
@@ -39,6 +42,13 @@ internal sealed class SteamLobbies : IPhoneLobbies, IDisposable
         _lobbies.ChatReceived += (lobby, sender, data) => Changed?.Invoke(new LobbyUpdate(LobbyChange.Chat, lobby, sender, data));
         _lobbies.MemberJoined += (lobby, member) => Changed?.Invoke(new LobbyUpdate(LobbyChange.MemberJoined, lobby, member));
         _lobbies.MemberLeft += (lobby, member) => Changed?.Invoke(new LobbyUpdate(LobbyChange.MemberLeft, lobby, member));
+        // Steam sends the friends list, blocked players included, at each sign-in; SteamKit2's SteamFriends keeps it.
+        _friendsList = connection.Subscribe<SteamFriends.FriendsListCallback>(list =>
+        {
+            if (list.Incremental) return;
+            int blocked = list.FriendList.Count(f => IsBlock(f.Relationship));
+            logger.Info(Tag, $"Steam friends list: {list.FriendList.Count} entries, {blocked} blocked");
+        });
     }
 
     public ulong LocalId { get; }
@@ -106,5 +116,15 @@ internal sealed class SteamLobbies : IPhoneLobbies, IDisposable
 
     public string? MemberName(ulong member) => _lobbies.MemberName(member);
 
-    public void Dispose() => _lobbies.Dispose();
+    public bool BlockedOnSteam(ulong player) =>
+        IsBlock(_connection.Client.GetHandler<SteamFriends>()?.GetFriendRelationship(new SteamID(player)) ?? EFriendRelationship.None);
+
+    private static bool IsBlock(EFriendRelationship relationship) =>
+        relationship is EFriendRelationship.Ignored or EFriendRelationship.IgnoredFriend;
+
+    public void Dispose()
+    {
+        _friendsList.Dispose();
+        _lobbies.Dispose();
+    }
 }

@@ -100,6 +100,12 @@ public partial class Launcher
     /// <summary>Asks before a mod with code is added or a mod is replaced, then says what happens next.</summary>
     private async Task<bool> ConfirmModAsync(ModImportResult question)
     {
+        if (question.Status == ModImportStatus.NeedsRelayConfirmation)
+        {
+            bool allow = await AskModAsync(question.Message, "Allow relay", "Keep relay off");
+            _view.ShowWorking("Adding the mod...");
+            return allow;
+        }
         bool code = question.Status == ModImportStatus.NeedsCodeConfirmation;
         if (!await AskModAsync(code ? question.Message : question.Message + " Your saves are kept.", code ? "Add code mod" : "Replace mod")) return false;
         _view.ShowWorking(code ? "Adding the mod..." : "Replacing the mod...");
@@ -129,14 +135,14 @@ public partial class Launcher
         finally { _modInstalling = false; }
     }
 
-    private async Task<bool> AskModAsync(string question, string confirm)
+    private async Task<bool> AskModAsync(string question, string confirm, string cancel = "Cancel")
     {
         _modQuestion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _modAnswer = answer => _modQuestion.TrySetResult(answer);
         _view.ChoiceMade += _modAnswer;
         try
         {
-            _view.ShowChoice(question, confirm, "Cancel", canGoBack: true, heading: "Mods");
+            _view.ShowChoice(question, confirm, cancel, canGoBack: true, heading: "Mods");
             return await _modQuestion.Task;
         }
         finally

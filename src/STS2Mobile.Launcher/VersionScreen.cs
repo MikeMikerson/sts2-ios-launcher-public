@@ -71,8 +71,8 @@ public sealed record VersionScreen(string Heading, string Status, IReadOnlyList<
                     ? $"Up to date with Steam's {branch}. The app never updates the game on its own."
                     : "Choose a version from Steam to replace the game on this iPhone. The app never updates the game on its own.";
             if (update) buttons.Add(new(UpdateLabel, VersionAction.Update, Primary: true));
-            // Stable only when this app has tested its build (GameVersionProblem.UntestedStable).
-            if (steam.Normal != null && GameInstaller.IsOffered(steam.Normal, GameProfile.ForManifest(steam.Normal.ManifestId)) && installed?.Branch != GameInstaller.NormalBranch) buttons.Add(new(SwitchToStableLabel, VersionAction.SwitchToStable, Primary: !update && buttons.Count == 0));
+            // Either branch, tested or not: an untested build's code is checked when the button is pressed, before anything is downloaded or deleted.
+            if (steam.Normal != null && installed?.Branch != GameInstaller.NormalBranch) buttons.Add(new(SwitchToStableLabel, VersionAction.SwitchToStable, Primary: !update && buttons.Count == 0));
             if (steam.Beta != null && installed?.Branch != GameInstaller.BetaBranch) buttons.Add(new(SwitchToBetaLabel, VersionAction.SwitchToBeta, Primary: !update && buttons.Count == 0));
         }
         if (installed is { Tested: false })
@@ -102,7 +102,7 @@ public sealed record VersionScreen(string Heading, string Status, IReadOnlyList<
     {
         if (build == null) return "not offered to this account";
         var profile = GameProfile.ForManifest(build.ManifestId);
-        string tested = profile != null ? $"v{profile.Version}, tested" : GameInstaller.IsOffered(build, profile) ? "untested" : "untested, not offered yet";
+        string tested = profile != null ? $"v{profile.Version}, tested" : "untested";
         string same = installed != null && installed.Manifest == build.ManifestId ? ", the one on this iPhone" : "";
         return $"build {build.BuildId}, {tested}{same}";
     }

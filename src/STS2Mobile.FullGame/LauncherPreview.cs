@@ -94,8 +94,8 @@ public static class LauncherPreview
             case "notprepared":
                 view.Step = SetupStep.Download;
                 view.SetNotice(Notice.Failure("Not prepared", "Game version 0.103.2 has not been tested with this app, and it cannot be prepared for this iPhone: the change "
-                    + "\"No LAN play\" does not fit it (Godot.ENetConnection is not in this game version.). The game cannot run without that change, so nothing was changed.\n"
-                    + "Choose the other version under Game version, or wait for an app update that supports this build."));
+                    + "\"No LAN play\" does not fit it (Godot.ENetConnection is not in this game version.), and the game cannot run without that change. Nothing was changed.\n"
+                    + GameAssemblyPreparation.RefusalNext));
                 view.ShowEntry(EntryScreen.For(Facts with { NoGameReason = EntryScreen.NoGame }));
                 break;
             case "cloud":

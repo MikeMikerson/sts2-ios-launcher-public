@@ -25,17 +25,9 @@ STARTUP_ARGUMENTS = ["--log-file", "user://full-game-startup.log"]
 VERBOSE_VARIABLE = "STS2_FULL_GAME_VERBOSE"
 # The single icon image the asset catalog keeps; Xcode makes every smaller size from it.
 APP_ICON = "AppIcon-1024.png"
-# This build does not request camera or photo-library access. The microphone is used only by QuickMatch's
-# voice chat (native/voice_audio.mm), asked for the first time the player turns their mic on in a match, so a
-# build carrying QuickMatch gets this text in place of the engine template's, and a build without it gets none.
-UNUSED_PURPOSE_KEYS = ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription", "NSMicrophoneUsageDescription")
+UNUSED_PURPOSE_KEYS = ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription")
 MICROPHONE_KEY = "NSMicrophoneUsageDescription"
-MICROPHONE_PURPOSE = (
-    "Voice chat with your Quick Match teammates. The microphone is used only while you turn your mic "
-    "on in a match, and your voice goes only to the other players of that match."
-)
-# The built-in voice chat's mod, as ./setup.sh stages it (tools/setup_ios.py).
-VOICE_MOD = ROOT / ".tools/builtin-mods/QuickMatch.dll"
+MICROPHONE_PURPOSE = "Mods can use the microphone for voice chat with other players."
 
 # Host-owned native sources under src/STS2Mobile.FullGame/native that the app must define.
 NATIVE_SOURCES = ("fmod_static_plugins.cpp",)
@@ -45,6 +37,7 @@ NATIVE_UNITS = {
     "orientation_guard.mm": ("B55555555555555555555555", "B66666666666666666666666", "sourcecode.cpp.objcpp"),
     "power_state.mm": ("B77777777777777777777777", "B88888888888888888888888", "sourcecode.cpp.objcpp"),
     "scene_lifecycle.mm": ("B99999999999999999999999", "BAAAAAAAAAAAAAAAAAAAAAAA", "sourcecode.cpp.objcpp"),
+    "steam_profile.mm": ("C1D2E3F40000000000000001", "C1D2E3F40000000000000002", "sourcecode.cpp.objcpp"),
     "mod_import.mm": ("BBBBBBBBBBBBBBBBBBBBBBBB", "BCCCCCCCCCCCCCCCCCCCCCCC", "sourcecode.cpp.objcpp"),
     "game_files.mm": ("BDDDDDDDDDDDDDDDDDDDDDDD", "BEEEEEEEEEEEEEEEEEEEEEEE", "sourcecode.cpp.objcpp"),
     "setup_overlay.mm": ("BFFFFFFFFFFFFFFFFFFFFFFF", "C00000000000000000000000", "sourcecode.cpp.objcpp"),
@@ -66,7 +59,7 @@ TRANSFORMATIONS = [
     "Compile the power state reader and the launch-time render resolution choice.",
     "Adopt the scene life cycle iOS 27 requires; the scene delegate takes over the engine window.",
     'Compile the Files picker behind the Mods screen\'s "Add mod from Files" button.',
-    "Compile QuickMatch's voice audio; the microphone text only in a build that carries QuickMatch.",
+    "Compile voice audio for imported mods and describe microphone access.",
 ]
 
 
@@ -209,11 +202,10 @@ def opaque_png(data: bytes) -> bytes:
     )
 
 
-def fill_purpose_strings(properties: dict, with_voice: bool) -> None:
+def fill_purpose_strings(properties: dict) -> None:
     for key in UNUSED_PURPOSE_KEYS:
         properties.pop(key, None)
-    if with_voice:
-        properties[MICROPHONE_KEY] = MICROPHONE_PURPOSE
+    properties[MICROPHONE_KEY] = MICROPHONE_PURPOSE
 
 
 def keep_exported_symbols(text: str) -> str:
@@ -294,7 +286,7 @@ def prepare() -> None:
         raise ValueError("Sentry dependency in generated full-game project")
     properties["godot_cmdline"] = startup_arguments()
     text = use_app_store_launch_packaging(text, properties)
-    fill_purpose_strings(properties, VOICE_MOD.is_file())
+    fill_purpose_strings(properties)
     adopt_scene_lifecycle(properties)
     text = keep_exported_symbols(text)
     text = add_host_files(text)

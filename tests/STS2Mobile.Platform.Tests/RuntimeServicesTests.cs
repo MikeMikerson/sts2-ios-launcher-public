@@ -1,3 +1,5 @@
+using STS2Mobile.ModApi;
+
 namespace STS2Mobile.Platform.Tests;
 
 // RuntimeServices binds once until unbound, so each fact starts unbound. Facts in one class do not run at the same time.
@@ -59,17 +61,24 @@ public class RuntimeServicesTests
     public void OtherPlayersInALobbyGetTheirSteamNames()
     {
         RuntimeServices.BindAccount(76561198000000001, "owner-account");
-        RuntimeServices.BindLobbies(new NamedLobbies());
+        var lobbies = new NamedLobbies();
+        RuntimeServices.BindLobbies(lobbies);
+        Assert.Same(lobbies, Multiplayer.Lobbies);
+        var voice = Assert.IsAssignableFrom<IVoiceDevice>(Multiplayer.Voice);
+        Assert.Equal(MicrophoneState.Unsupported, voice.CaptureState);
+        Assert.False(voice.StartCapture());
+        Assert.Equal(0, voice.ReadCapture(new short[160]));
         Assert.Throws<InvalidOperationException>(() => RuntimeServices.BindLobbies(new NamedLobbies()));
         Assert.Equal("owner-account", RuntimeServices.GetPlayerName(76561198000000001));
         Assert.Equal("Friend Name", RuntimeServices.GetPlayerName(76561198000000002));
         Assert.Equal("[unknown]", RuntimeServices.GetPlayerName(76561198000000003));
 
         RuntimeServices.Unbind();
-        Assert.Null(RuntimeServices.Lobbies);
+        Assert.Null(Multiplayer.Lobbies);
+        Assert.Null(Multiplayer.Voice);
     }
 
-    private sealed class NamedLobbies : IPhoneLobbies
+    private sealed class NamedLobbies : ISteamLobbies
     {
         public ulong LocalId => 76561198000000001;
         public event Action<LobbyUpdate>? Changed { add { } remove { } }
@@ -87,5 +96,6 @@ public class RuntimeServicesTests
         public IReadOnlyList<ulong> Members(ulong lobby) => [];
         public bool SendChat(ulong lobby, byte[] data, int length, ulong target) => false;
         public string? MemberName(ulong member) => member == 76561198000000002 ? "Friend Name" : null;
+        public bool BlockedOnSteam(ulong player) => false;
     }
 }

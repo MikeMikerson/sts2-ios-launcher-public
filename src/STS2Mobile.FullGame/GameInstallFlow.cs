@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Godot;
@@ -53,8 +54,9 @@ public sealed class GameInstallFlow
         {
             _view.ShowProgress("Asking Steam which versions it has...", -1, canGoBack: true);
             var builds = await ReadBuildsAsync(attempt);
-            var normal = _installer.Check(builds.Normal);
-            var beta = _installer.Check(builds.Beta);
+            // Only what can run is offered: an untested build's code is fetched alone and checked first.
+            var normal = await CheckCodeAsync(_installer.Check(builds.Normal), attempt);
+            var beta = await CheckCodeAsync(_installer.Check(builds.Beta), attempt);
             bool normalUsable = normal.Problem == GameVersionProblem.None, betaUsable = beta.Problem == GameVersionProblem.None;
             if (!normalUsable && !betaUsable) return GameInstallMessages.NeitherUsable(normal, beta);
             // A game still here (one that does not run, say) is replaced: a switch backs the saves up first.
@@ -69,6 +71,7 @@ public sealed class GameInstallFlow
         {
             return Failure(error);
         }
+        finally { await DeleteCheckedCodeAsync(); }
     }
 
     /// <summary>
@@ -81,7 +84,7 @@ public sealed class GameInstallFlow
         {
             _view.ShowProgress("Asking Steam for its current build...", -1, canGoBack: true);
             var builds = await ReadBuildsAsync(attempt);
-            var check = _installer.Check(builds.For(branch));
+            var check = await CheckCodeAsync(_installer.Check(builds.For(branch)), attempt);
             if (check.Problem != GameVersionProblem.None) return GameInstallMessages.Problem(check, GameInstallMessages.Name(branch));
             return await ConfirmAndDownloadAsync(check, installed, null, null, attempt);
         }
@@ -89,6 +92,7 @@ public sealed class GameInstallFlow
         {
             return Failure(error);
         }
+        finally { await DeleteCheckedCodeAsync(); }
     }
 
     /// <summary>Confirms, then deletes the game and everything of a download under way. The player's saves and sign-in stay.</summary>
@@ -144,6 +148,33 @@ public sealed class GameInstallFlow
         return await DownloadAsync(check, depot, plan, backup, attempt);
     }
 
+    /// <summary>
+    /// An untested build's code, fetched alone (about 10 MB) and checked with the patch list and the game references before anything else is
+    /// downloaded or deleted. A tested build, or one Steam does not offer, comes back as it was.
+    /// </summary>
+    private async Task<GameVersionCheck> CheckCodeAsync(GameVersionCheck check, CancellationToken attempt)
+    {
+        if (check.Problem != GameVersionProblem.None || check.Tested) return check;
+        string name = GameInstallMessages.Name(check.Build!.Branch);
+        using var depot = await OpenAsync(check, attempt);
+        var plan = _installer.Plan(null, depot.Manifest);
+        long code = GameInstaller.DownloadBytes(_installer.CodePlan(check.Build.ManifestId, plan));
+        _view.ShowProgress(GameInstallMessages.CheckingCode(name, code), -1, canGoBack: true);
+        var clock = Stopwatch.StartNew();
+        check = await _installer.CheckCodeAsync(check, plan, depot, GamePreparation.CheckCodeAsync, attempt);
+        GD.Print($"Code check {name} ({Describe(check.Build)}): {code / Megabyte} MB fetched and checked in {clock.ElapsedMilliseconds} ms: "
+            + (check.Problem == GameVersionProblem.CannotRun ? "cannot run, " + check.Reason : $"runs, {check.Skipped?.Count ?? 0} optional changes skipped{(check.Skipped is { Count: > 0 } s ? " (" + string.Join("; ", s) + ")" : "")}, "
+                + (check.LeftOut is { Count: > 0 } left ? "built-in mods left out: " + string.Join("; ", left.Select(mod => $"{mod.Id} ({mod.Reason})")) : "every built-in mod fits")) + ".");
+        return check;
+    }
+
+    /// <summary>Whatever code was fetched to be checked and not taken into a download goes, off the main thread.</summary>
+    private Task DeleteCheckedCodeAsync() => Task.Run(() =>
+    {
+        try { _installer.DeleteCheckedCode(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { GD.PushWarning("The checked code could not be deleted: " + error.Message); }
+    });
+
     private GameVersionCheck CheckSpace(GameVersionCheck check, IReadOnlyList<DepotFile> plan, string name)
     {
         check = _installer.CheckSpace(check, plan);
@@ -162,7 +193,12 @@ public sealed class GameInstallFlow
         // The figure the player was asked about: what comes over the network, not what it unpacks to.
         long wire = GameInstaller.DownloadBytes(plan);
         _view.ShowProgress("Getting ready to download...", -1);
-        await Task.Run(() => _installer.Begin(check.Build!.Branch, check.Build.ManifestId, check.Build.BuildId), attempt);
+        await Task.Run(() =>
+        {
+            _installer.Begin(check.Build!.Branch, check.Build.ManifestId, check.Build.BuildId);
+            // The code checked before the download is already this build's: the download finds it finished.
+            _installer.TakeCheckedCode(check.Build.ManifestId, plan);
+        }, attempt);
         var clock = Stopwatch.StartNew();
         var (before, _) = MemoryFootprint.Read();
         int reported = -1;

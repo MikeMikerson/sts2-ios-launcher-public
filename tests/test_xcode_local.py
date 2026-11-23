@@ -142,7 +142,6 @@ class PrepareFlowTests(unittest.TestCase):
         with (
             mock.patch.object(xcode, "EXPORT", export),
             mock.patch.object(xcode, "HOST", host),
-            mock.patch.object(xcode, "VOICE_MOD", root / "QuickMatch.dll"),
             mock.patch.object(xcode, "local_settings", return_value=settings),
             mock.patch("builtins.print"),
         ):

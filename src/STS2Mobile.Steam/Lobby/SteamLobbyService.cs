@@ -8,7 +8,7 @@ namespace STS2Mobile.Steam.Lobby;
 public readonly record struct LobbySummary(ulong Id, int Members, IReadOnlyDictionary<string, string> Data);
 
 /// <summary>
-/// Steam lobbies and lobby chat for QuickMatch. Everything travels as ordinary Steam messages
+/// Steam lobbies and lobby chat for imported mods. Everything travels as ordinary Steam messages
 /// on the signed-in connection, so nothing here opens a connection of its own and the network policy is unchanged. Losing that
 /// connection leaves every lobby, so it is held open while we are in one (it otherwise closes after 30 idle seconds). SteamKit2
 /// keeps each lobby's owner, members and their Steam names up to date.
@@ -17,7 +17,7 @@ public sealed class SteamLobbyService : IDisposable
 {
     private const string Tag = "Lobby";
 
-    /// <summary>Several data changes in a row (QuickMatch publishes seven values and a type) go out as one request.</summary>
+    /// <summary>Several data changes in a row go out as one request.</summary>
     private const int DataSendDelayMs = 50;
 
     private readonly ILobbyConnection _connection;
@@ -59,8 +59,7 @@ public sealed class SteamLobbyService : IDisposable
     public event Action<ulong, ulong>? MemberLeft;
 
     /// <summary>
-    /// Lobbies Steam took us out of because the connection closed. Raised on the connection's callback thread. Nothing rejoins them:
-    /// the other players end the match within QuickMatch's grace period (1.5 s) once Steam tells them we left.
+    /// Lobbies Steam took us out of because the connection closed. Raised on the connection's callback thread.
     /// </summary>
     public event Action<IReadOnlyList<ulong>>? LobbiesLost;
 
@@ -260,8 +259,7 @@ public sealed class SteamLobbyService : IDisposable
 
     /// <summary>
     /// Connecting blocks, so it happens on a worker thread rather than the game's. Null when Steam cannot be reached, for example
-    /// offline, since the game may start without a connection: the caller answers as a refusal, which QuickMatch reports to the
-    /// player, rather than throwing into the game.
+    /// when the player starts the game offline.
     /// </summary>
     private async Task<SteamMatchmaking?> ConnectedAsync(string request, CancellationToken ct)
     {

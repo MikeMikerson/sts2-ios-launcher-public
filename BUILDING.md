@@ -70,7 +70,7 @@ The app downloads the game itself. `scripts/prepare-game-files.sh` makes the sam
 
 1. Verify the supported game assembly and asset-pack hashes.
 2. Extract and audit resources, remove Sentry, convert phone textures to ASTC, limit particle pre-simulation, and prepare the shader inventory.
-3. Build the platform boundary and the adapters, patch the game assembly, check the code mods listed in `mods/builtin.json` (QuickMatch, when setup fetched it) against their pinned hashes, and weave their patches in.
+3. Build the platform boundary and the adapters, patch the game assembly, check the code mods listed in `mods/builtin.json` against their pinned hashes, and weave their patches in.
 4. Check every game reference of the game-facing assemblies against the patched game.
 5. Write `analysis/game-files`, which goes into the app's `Documents/game`: the game's own assemblies and pack. The app makes the assembly, the converted textures and the pack it runs from those.
 6. Write `analysis/full-game-reference/FullGame.pck`, the Python tools' game pack, which stays on the Mac for `tests/GamePack.Tests` to compare with.
@@ -96,10 +96,8 @@ Each is an environment variable, passed to `scripts/simulator-run.sh` as `ENV=VA
 - `STS2_FREE_BYTES=<n>` stands in for the free space; `STS2_START_FAILURE=start|unsupported` and `STS2_PREPARE_FAILURE=1` stand in for those failures.
 - `STS2_CLOUD_SEND_DRY_RUN=1`: a Send does everything but the upload calls and logs what it would send. A Send whose confirmation `STS2_AUTO_TAP` presses is refused unless `STS2_CLOUD_SEND_REAL=1` is also set.
 - `STS2_AUTOSLAY=<seed>`: the game's own automatic player plays a whole new run and returns to the menu, logging `[AutoSlay] [MemProfile]` lines per room. Pass `STS2_AUTO_TAP=Play` too. It replaces the saved run and changes unlocks, so copy `Documents/steam` first and restore it after.
-- `STS2_OPEN_MULTIPLAYER=1` opens the game's multiplayer menu once the main menu is up and logs QuickMatch's buttons; `STS2_OPEN_MULTIPLAYER=quickmatch` also presses Quick Match and a party of two, so QuickMatch searches Steam's lobbies and hosts one.
-- `STS2_RELAY_DROP_AFTER=<seconds>` drops each relay connection that long after it opens; `STS2_STEAM_DROP_AFTER=<seconds>` closes the Steam connection that long after each lobby is entered or created.
-- `STS2_VOICE=off` leaves QuickMatch with no voice device. `STS2_CHECK_VOICE=1` runs the voice audio once at startup (grant the microphone first with `xcrun simctl privacy <udid> grant microphone <bundle id>`).
-- `STS2_CHECK_RELAY_RUNTIME=ws://127.0.0.1:<port>/...` checks AES-GCM, HKDF, HMAC and one WebSocket echo under the app's Mono at startup (needs an echo server on the Mac).
+- `STS2_STEAM_DROP_AFTER=<seconds>` closes the Steam connection that long after each lobby is entered or created.
+- `STS2_CHECK_VOICE=1` runs the voice audio once at startup (grant the microphone first with `xcrun simctl privacy <udid> grant microphone <bundle id>`).
 - `STS2_TEXTURE_OPTIONS=<workers,large threads,batch MB,large MB>`: four positive whole numbers that tune the texture conversion during preparation, for measuring it without a rebuild. Anything else leaves the defaults.
 - `STS2_MODS=1` or `0` turns the launcher's mods switch on or off for that launch only; the saved choice is not changed.
 - `STS2_IMPORT_MOD=<name>.zip` imports that zip from the app's `Documents` during preparation, through the same importer as **Import from Files**. It skips the question a code mod asks, so it is for tests only.
@@ -133,14 +131,15 @@ Moving to a new game version (as done for v0.111.0 to v0.113.0):
 3. Bump the version in the profile ids together: `tools/profiles.py`, `TextureProfile` in `src/STS2Mobile.GamePack/GamePackBuilder.cs` and the label in `tools/FullGamePatcher/Program.cs`. Set `GAME_PACK_ENTRIES` in `tools/stage_full_game.py` from the new pack's directory.
 4. Run `./setup.sh --prepare-only` and `scripts/prepare-game-files.sh`, and fix each patch that fails in `src/STS2Mobile.GamePatcher`. Phones on the previous profile run the same patches, so a renamed target is found by either name (`GamePatch.Method(type, name, earlierName)`). Compare the patch report (`analysis/full-game-managed/public/game/profile.json`) with the previous version's, and look at every method whose patch moved.
 5. Copy `keptOriginal` from `analysis/full-game-textures-astc-v1/texture-report.json` into `textures_kept_original`.
-6. Build QuickMatch against the new game and run its tests (its repository says how). The weave check sees only the calls a mod makes, not the abstract members it must implement, so a game that changed QuickMatch's base types needs a new QuickMatch release, pinned here.
-7. Run `scripts/test.sh`, build, and set up the new version on a phone. Measure setup's peak disk use for `peak_disk_bytes`, play a fight, and only then pin the installed-game tests' output hashes.
+6. Run `scripts/test.sh`, build, and set up the new version on a phone. Measure setup's peak disk use for `peak_disk_bytes`, play a fight, and only then pin the installed-game tests' output hashes.
 
 Python packages are pinned by wheel hash in `tools/requirements.txt`; to change one, replace its version and its `--hash` with the values PyPI lists for the `cp313` macOS arm64 wheel. NuGet packages are locked in the `packages*.lock.json` next to each project: the plain file for ordinary builds and tests, and one per runtime (`packages.ios-arm64.lock.json`, and `.mono` for the Mono publish) for the iOS publishes, whose dependencies differ. After changing a package reference, run the restores once with `RestoreLockedMode=false` in the environment (for example `RestoreLockedMode=false ./setup.sh`, `scripts/build-mono.sh` and `scripts/test.sh`), check the changed lock files and commit them.
 
-A code mod is pinned in `mods/builtin.json` by the SHA-256 of its DLL and its manifest, and an optional one (QuickMatch) also in `tools/dependencies.json`, from which `./setup.sh` fetches it into `.tools/builtin-mods`; with no release and no copy in `.local/quickmatch`, the app is built without it. `scripts/prepare-game-files.sh` refuses a mod whose files no longer match, so a changed mod needs a deliberate update of that file.
+### Multiplayer mod builds
 
-QuickMatch's relay is not in its release: whoever builds chooses it. `QUICKMATCH_RELAY=wss://<host>` (or `https://<host>`, nothing after the host) in the environment when running `./setup.sh`, or else a `.local/QuickMatchRelay.cfg`, is written into `.tools/builtin-mods/QuickMatchRelay.cfg` and built into the app. That file has `key = value` lines and `#` comments: `relay = https://<host>` (or `wss://<host>`), and optionally `enabled = true` or `false`. Setup checks either setting as the app does (a host name on port 443, no IP address, path or query; no unknown or repeated keys) and stops on a problem. With neither, or without QuickMatch, the app has no relay, and QuickMatch matches over Steam lobby chat with no voice chat. Never put a relay address in a tracked file.
+Reference `src/STS2Mobile.ModApi/STS2Mobile.ModApi.csproj` or its built `STS2Mobile.ModApi.dll` with copy-local disabled. The launcher supplies the assembly at runtime. The API namespace is `STS2Mobile.ModApi`. Use `Multiplayer.Lobbies` for Steam discovery, membership, metadata and chat. Call `Multiplayer.RequestSteamProfile(steamId)` on the game thread when a player selects a teammate. It returns true when the launcher presents its Open or Cancel prompt. Lobby events arrive on Steam's threads. `Multiplayer.Voice` exposes permission state, capture and playback of 16 kHz mono PCM on the game thread.
+
+For relay access, include an optional `<mod-id>.cfg` beside the DLL and manifest in the import zip. Set `relay = wss://<host>` with a DNS hostname and no path. Call `Multiplayer.GetRelay()` from the mod assembly. When it returns a transport, call `Open(region, listener)` and dispose the socket when finished. A missing or declined relay leaves the mod free to use lobby chat. Do not include the API DLL in the zip.
 
 ## Troubleshooting
 

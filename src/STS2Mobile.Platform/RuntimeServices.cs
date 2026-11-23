@@ -1,3 +1,5 @@
+using STS2Mobile.ModApi;
+
 namespace STS2Mobile.Platform;
 
 /// <summary>
@@ -10,7 +12,6 @@ public static class RuntimeServices
     private static Func<Task<bool>>? _verifyOwnership;
     private static ulong _steamId;
     private static string? _displayName;
-    private static IPhoneLobbies? _lobbies;
 
     public static void BindOwnershipVerifier(Func<Task<bool>> verifyOwnership)
     {
@@ -39,22 +40,28 @@ public static class RuntimeServices
         _displayName = displayName;
     }
 
-    /// <summary>Steam lobbies on the signed-in account, for a built-in multiplayer mod. Bound with the account.</summary>
-    public static void BindLobbies(IPhoneLobbies lobbies)
+    /// <summary>Steam lobbies on the signed-in account, for imported multiplayer mods. Bound with the account.</summary>
+    public static void BindLobbies(ISteamLobbies lobbies)
     {
         ArgumentNullException.ThrowIfNull(lobbies);
-        if (Interlocked.CompareExchange(ref _lobbies, lobbies, null) != null)
-            throw new InvalidOperationException("Lobbies are already bound.");
+        Multiplayer.BindLobbies(lobbies);
+        Multiplayer.ProfilePrompt = RequestSteamProfile;
+        Multiplayer.Voice = new PhoneVoiceDevice();
     }
 
-    /// <summary>The bound lobbies, or null before the launcher binds them.</summary>
-    public static IPhoneLobbies? Lobbies => Volatile.Read(ref _lobbies);
+    private static unsafe bool RequestSteamProfile(ulong steamId)
+    {
+        var prompt = (delegate* unmanaged<ulong, int>)NativeExports.Find("sts2_request_steam_profile");
+        return prompt != null && prompt(steamId) != 0;
+    }
 
     /// <summary>The game did not start, so the next attempt can bind again, perhaps with another account.</summary>
     public static void Unbind()
     {
         Volatile.Write(ref _verifyOwnership, null);
-        Volatile.Write(ref _lobbies, null);
+        Multiplayer.UnbindLobbies();
+        Multiplayer.ProfilePrompt = null;
+        Multiplayer.Voice = null;
         _steamId = 0;
         _displayName = null;
     }
@@ -66,7 +73,7 @@ public static class RuntimeServices
     /// Steam's placeholder for anyone else.
     /// </summary>
     public static string GetPlayerName(ulong playerId) =>
-        playerId == GetLocalPlayerId() ? _displayName! : Lobbies?.MemberName(playerId) ?? UnknownPlayerName;
+        playerId == GetLocalPlayerId() ? _displayName! : Multiplayer.Lobbies?.MemberName(playerId) ?? UnknownPlayerName;
 
     /// <summary>
     /// The game waits on this before reading saves. Saves move to and from Steam Cloud only when the

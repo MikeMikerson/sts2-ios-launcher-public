@@ -1,13 +1,13 @@
 # Network boundaries
 
-The running app permits only HTTPS or WSS on port 443, to Steam and Mega Crit, plus QuickMatch's relay as described below. Domain boundaries, TLS, port restrictions, redirects, proxy bypass, Host-header checks, and URL override protections are enforced. The allowed hosts:
+The running app permits only HTTPS or WSS on port 443, to Steam and Mega Crit, plus an imported mod's relay as described below. Domain boundaries, TLS, port restrictions, redirects, proxy bypass, Host-header checks, and URL override protections are enforced. The allowed hosts:
 
 | What | Allowed hosts | Scheme and port | Rule in the code |
 | --- | --- | --- | --- |
 | The Steam connection and the launcher's Steam web calls: sign-in, ownership, lobbies, cloud calls, the game download | `steampowered.com`, `steamcommunity.com`, `steamcontent.com`, `steamstatic.com`, `steamserver.net`, and names under them | HTTPS or WSS, 443 | `src/STS2Mobile.Steam/Network/SteamNetworkPolicy.cs` (`IsAllowed`) |
 | Steam Cloud's file storage, for Get (GET only) and Send (PUT or POST only) | `steamcloud-<name>.s3.dualstack.<region>.amazonaws.com`, `steamcloud-<name>.storage.googleapis.com`, `steamcloud<name>.blob.core.windows.net` | HTTPS, 443 | `SteamNetworkPolicy.IsCloudStorage` and `src/STS2Mobile.Steam/Network/CloudStorageAccess.cs` |
 | The game's own web requests | `megacrit.com`, `steampowered.com`, `steamcommunity.com`, `steamcontent.com`, `steamstatic.com`, and names under them | HTTPS, 443 | `src/STS2Mobile.Platform/GameNetworkPolicy.cs` |
-| QuickMatch's relay, only during a match, only in a build that has one | the one host named at build time, paths `/v1/relay/` plus `auto`, `apac`, `na` or `eu` | WSS, 443 | `RelayNetworkPolicy` in `src/STS2Mobile.Platform/RelayConnection.cs` |
+| An imported mod's approved relay | the one host in its config, paths `/v1/relay/` plus `auto`, `apac`, `na` or `eu` | WSS, 443 | `RelayNetworkPolicy` in `src/STS2Mobile.Platform/RelayConnection.cs` |
 
 Every rule refuses IP addresses, user names and passwords in the address, and any other port. The clients that use them follow no redirects and use no proxy, cookies or overridden Host header.
 
@@ -20,9 +20,11 @@ They are not general app destinations, and both clients keep every other rule ab
 
 The game's download comes from Steam's content servers, under `steamcontent.com`, through the same policy-checked client. Servers Steam offers outside that policy (other hosts, plain HTTP, proxies) are skipped. It starts only when the player asks.
 
-Online co-op runs only through QuickMatch, an optional code mod built into the app when setup has it (it runs only with mods on). A build without QuickMatch has no online co-op. Its lobbies (search, host, join, lobby data and lobby chat) go over the signed-in Steam connection, like the cloud save calls. The game's LAN play (raw sockets and ENet) is disabled at build time, and its own Steamworks multiplayer does not run on iOS. QuickMatch's voice chat is the only use of the microphone. A build that carries QuickMatch says so in its microphone text; iOS asks the first time the player turns their mic on in a match, never at launch. Recording runs only while the mic is on, the voice is offered only when the build has the relay, and QuickMatch sends it only over the relay, encrypted, to the players of that match. A build without QuickMatch has no microphone text and never records.
+Imported mods use the launcher's lobby API for discovery, membership, metadata and chat over the signed-in Steam connection. The API does not expose credentials. An imported code mod runs in the app process and must be trusted.
 
-QuickMatch's relay is the one destination outside Steam and Mega Crit. It is not part of QuickMatch's release: whoever builds the app chooses it at build time, with `QUICKMATCH_RELAY=wss://<host>` (or `https://<host>`) in the environment when running `./setup.sh`, or a `.local/QuickMatchRelay.cfg` file of `key = value` lines and `#` comments (`relay = https://<host>`, and optionally `enabled = true` or `false`). Setup checks either setting as the app does, stops on a problem, and builds the relay into the app as `QuickMatchRelay.cfg`. The app accepts only a host name on port 443, with no IP address, path or query. The app connects to the relay only during a QuickMatch match, and only to that one host, over WSS on port 443, to the relay's room paths only, with no proxy, redirects, cookies or Host override. It carries QuickMatch's encrypted game messages between the players of one match. The Steam sign-in, its tokens and any Steam credential never go to it. The relay sees each player's address, the match's room token, Steam IDs, message sizes and timing. With neither setting the build has no relay and never connects to one: QuickMatch matches over Steam lobby chat, which is slower, with no voice chat.
+An imported mod can ask the launcher to show a Steam profile. The player sees the exact Steam Community profile URL and chooses Open or Cancel. Open hands that URL to iOS without attaching the launcher's Steam session.
+
+The relay API opens a secure WebSocket to the single host in the calling mod's config after player approval for that mod and host. A different host requires fresh approval. Steam credentials are never attached to the connection. The relay sees the player's IP address, traffic timing and the data the mod chooses to send.
 
 The build-time setup process downloads toolchains and dependencies from the pinned sources in its manifest. These build-time downloads are separate from the app's runtime network policy.
 

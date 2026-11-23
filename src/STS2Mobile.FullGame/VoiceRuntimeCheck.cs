@@ -8,10 +8,9 @@ namespace STS2Mobile.FullGame;
 
 /// <summary>
 /// <c>STS2_CHECK_VOICE=1</c>: runs the app's voice audio (<c>native/voice_audio.mm</c>, through <see cref="VoiceAudio"/>) the way
-/// QuickMatch's voice chat drives it, with nobody there: the microphone permission and capture state, two seconds of recording
+/// an imported mod drives it, with nobody there: the microphone permission and capture state, two seconds of recording
 /// with how many samples arrived and where from, and one second of a quiet tone played and drained. On the simulator the
-/// microphone is the Mac's, so this shows the pieces load and run, not that anyone hears them.
-/// A test switch: it logs and changes nothing. Game thread only, like <see cref="VoiceAudio"/>.
+/// microphone is the Mac's, so this shows the pieces load and run, not that anyone hears them. A test switch: it logs and changes nothing. Game thread only, like <see cref="VoiceAudio"/>.
 /// </summary>
 internal static class VoiceRuntimeCheck
 {

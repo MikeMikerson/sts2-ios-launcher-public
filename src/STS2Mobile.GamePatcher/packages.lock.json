@@ -8,8 +8,14 @@
         "resolved": "0.11.6",
         "contentHash": "f33RkDtZO8VlGXCtmQIviOtxgnUdym9xx/b1p9h91CRGOsJFxCFOFK1FDbVt1OCf1aWwYejUFa2MOQyFWTFjbA=="
       },
-      "sts2mobile.platform": {
+      "sts2mobile.modapi": {
         "type": "Project"
+      },
+      "sts2mobile.platform": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.ModApi": "[1.0.0, )"
+        }
       }
     },
     "net9.0": {
@@ -19,8 +25,14 @@
         "resolved": "0.11.6",
         "contentHash": "f33RkDtZO8VlGXCtmQIviOtxgnUdym9xx/b1p9h91CRGOsJFxCFOFK1FDbVt1OCf1aWwYejUFa2MOQyFWTFjbA=="
       },
-      "sts2mobile.platform": {
+      "sts2mobile.modapi": {
         "type": "Project"
+      },
+      "sts2mobile.platform": {
+        "type": "Project",
+        "dependencies": {
+          "STS2Mobile.ModApi": "[1.0.0, )"
+        }
       }
     }
   }

@@ -4,4 +4,8 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>STS2Mobile.Tools.Mono</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The same lines the patcher checks at preparation (list-game-references). -->
+    <Compile Include="../../../src/STS2Mobile.GamePatcher/GameReferenceList.cs" Link="GameReferenceList.cs" />
+  </ItemGroup>
 </Project>

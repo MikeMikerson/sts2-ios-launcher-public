@@ -1,6 +1,7 @@
 using System.Reflection;
 using Mono.Cecil;
 using STS2Mobile.Platform;
+using STS2Mobile.ModApi;
 
 namespace STS2Mobile.ModWeaver.Tests;
 
@@ -23,6 +24,27 @@ public sealed class WovenModTests : IClassFixture<WovenGoodMod>
 
     [Fact]
     public void NoSteamworksUseIsReported() => Assert.Empty(_woven.Report.SteamworksCalls);
+
+    [Fact]
+    public void WovenConsumerUsesLauncherServices()
+    {
+        var mod = _woven.Mod.GetType("GoodMod.Main")!;
+        var lobbies = DispatchProxy.Create<ISteamLobbies, LobbyProxy>();
+        RuntimeServices.BindLobbies(lobbies);
+        try
+        {
+            Assert.Equal(42UL, mod.GetMethod("LobbyPlayer")!.Invoke(null, null));
+            Assert.Equal(true, mod.GetMethod("HasVoiceDevice")!.Invoke(null, null));
+            Assert.Equal(false, mod.GetMethod("HasRelay")!.Invoke(null, null));
+        }
+        finally { RuntimeServices.Unbind(); }
+    }
+
+    public class LobbyProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? method, object?[]? arguments) =>
+            method?.Name == "get_LocalId" ? 42UL : throw new NotSupportedException();
+    }
 
     [Fact]
     public void WovenModNoLongerDependsOnHarmony()

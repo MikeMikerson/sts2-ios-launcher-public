@@ -197,9 +197,9 @@ def prepare_tree() -> None:
     # The patcher embeds these (src/STS2Mobile.GamePatcher).
     shutil.copy2(ROOT / "tools/dependencies.json", TREE / "tools/dependencies.json")
     shutil.copytree(ROOT / "mods", TREE / "mods")
-    # The built-in mods' files, embedded by the patcher and compiled against by the host, when setup fetched them.
-    if (ROOT / ".tools/builtin-mods").is_dir():
-        shutil.copytree(ROOT / ".tools/builtin-mods", TREE / ".tools/builtin-mods")
+    # The host's game references, which the patcher embeds (scripts/list-game-references.sh).
+    (TREE / ".tools").mkdir(exist_ok=True)
+    shutil.copy2(ROOT / ".tools/game-references.txt", TREE / ".tools/game-references.txt")
 
 
 def patch_godotsharp() -> None:
@@ -250,14 +250,15 @@ def publish_inputs() -> dict[str, str]:
     """A hash of every file a publish reads, except the interpreted game host's sources (--host-only swaps only that)."""
     skip = {".godot", "bin", "obj"}
     files: list[Path] = []
-    for top in (ROOT / "src", ROOT / "mods", ROOT / ".tools/builtin-mods"):
+    for top in (ROOT / "src", ROOT / "mods"):
         if top.is_dir():
             files += [
                 path for path in top.rglob("*")
                 if path.is_file() and not skip.intersection(path.relative_to(ROOT).parts)
                 and path.relative_to(ROOT).parts[:2] != ("src", HOST_PROJECT)
             ]
-    files += [ROOT / name for name in ("global.json", "Directory.Build.props", ".editorconfig", "tools/dependencies.json")]
+    # The game references list follows the host's sources, but the patcher embeds it, so --host-only cannot swap it in.
+    files += [ROOT / name for name in ("global.json", "Directory.Build.props", ".editorconfig", "tools/dependencies.json", ".tools/game-references.txt")]
     return {str(path.relative_to(ROOT)): sha256_file(path) for path in sorted(files) if path.is_file()}
 
 

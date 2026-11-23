@@ -63,7 +63,6 @@ public partial class Launcher : Control
     /// <summary>Nothing may load the game's assembly until preparation has made it, so the game comes after it.</summary>
     private async Task StartupAsync()
     {
-        if (OS.GetEnvironment("STS2_CHECK_RELAY_RUNTIME") is { Length: > 0 } relayCheck) await RelayRuntimeCheck.RunAsync(relayCheck);
         if (OS.GetEnvironment("STS2_CHECK_VOICE") == "1") await VoiceRuntimeCheck.RunAsync();
         ModLaunchSettings.Capture(LauncherFolder, OS.GetEnvironment("STS2_MODS"));
         OS.SetEnvironment("STS2_MODS", ModLaunchSettings.Enabled ? "1" : "0");
@@ -78,8 +77,7 @@ public partial class Launcher : Control
 
         var prepared = await PrepareGameAsync();
         _modsPrepared = prepared.Status is PreparationStatus.Prepared or PreparationStatus.Cached;
-        // QuickMatch that does not fit this game: the game starts without it, and the player is told why.
-        if (prepared.Notice != null && ModLaunchSettings.Enabled) _view.SetNotice(Notice.Failure("Quick Match is off", prepared.Notice));
+        if (prepared.Notice != null && ModLaunchSettings.Enabled) _view.SetNotice(Notice.Failure("Mod unavailable", prepared.Notice));
         if (prepared.ModRefused && ModLaunchSettings.Enabled)
         {
             _modRefusal = prepared.Message;
@@ -385,7 +383,7 @@ public partial class Launcher : Control
         // The game's own start check: answered from the stored sign-in, which Play has just required, so it needs no connection either.
         RuntimeServices.BindOwnershipVerifier(() => Task.FromResult(_login.OwnershipConfirmed));
         RuntimeServices.BindAccount(_login.SteamId, _login.PlayerName);
-        // Steam lobbies for a built-in multiplayer mod. Binding sends nothing; the first lobby request connects, and offline it fails as a refusal.
+        // Steam connects on the first lobby request so binding the account also works offline.
         _lobbies = new SteamLobbies(_login.Connection, _login.SteamId, GodotSteamLogger.Instance);
         RuntimeServices.BindLobbies(_lobbies);
         SessionStats.Mark("game-start");

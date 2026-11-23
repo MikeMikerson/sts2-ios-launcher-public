@@ -21,9 +21,18 @@ public enum PreparationStatus
 /// <param name="Message">For <see cref="PreparationStatus.Refused"/>, what to tell the player.</param>
 /// <param name="Tested">The game was prepared against a profile.</param>
 /// <param name="Patches">How each patch went, for an assembly that was made or cached.</param>
-/// <param name="Notice">For an assembly made or cached without an optional built-in mod that was refused (QuickMatch), what to tell the player.</param>
+/// <param name="Notice">For an assembly made or cached without an optional built-in mod that was refused, what to tell the player.</param>
 public sealed record PreparationResult(PreparationStatus Status, string? Message = null, string? InputSha256 = null, string? OutputSha256 = null, TimeSpan Elapsed = default,
     bool Tested = true, IReadOnlyList<PatchOutcome>? Patches = null, bool ModRefused = false, string? Notice = null);
+
+/// <summary>What <see cref="GameAssemblyPreparation.CheckCode"/> found in a build's code before the rest of it was downloaded.</summary>
+/// <param name="Reason">Why the build cannot run with this app, as the end of a sentence ("it lacks ..."), or null when it can.</param>
+/// <param name="Skipped">The changes the game can run without that do not fit it, by name: what it plays without.</param>
+/// <param name="LeftOut">The optional built-in mods preparation would leave out of this build, each with why.</param>
+public sealed record CodeCheck(string? Reason, IReadOnlyList<string> Skipped, IReadOnlyList<ModLeftOut>? LeftOut = null);
+
+/// <summary>An optional built-in mod a build's game would start without, by the name its manifest gives the player, and why it does not fit.</summary>
+public sealed record ModLeftOut(string Id, string Name, string Reason);
 
 /// <summary>
 /// Verifies the game's files and makes the assembly the game runs, once per input and app. A crash at
@@ -36,8 +45,10 @@ public sealed record PreparationResult(PreparationStatus Status, string? Message
 /// <param name="patcherId">Identifies the code doing the patching. A new app with other patches makes a new result.</param>
 /// <param name="build">Makes the outputs from the input folder, into an empty folder, and says how each patch went.</param>
 /// <param name="version">The game's version, for the player's messages; the profile's when there is one.</param>
+/// <param name="gameReferences">The game members the app's code uses (<see cref="GameReferenceList"/>): a prepared assembly that lacks one
+/// is refused, tested or not. Null checks nothing.</param>
 public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? profile, string patcherId, Func<string, string, IReadOnlyList<PatchOutcome>> build, string? version = null,
-    string? modInputs = null, string? modInputRefusal = null, Func<string?>? notice = null)
+    string? modInputs = null, string? modInputRefusal = null, Func<string?>? notice = null, IReadOnlyList<string>? gameReferences = null)
 {
     public const string RecordName = "assembly-preparation.json";
     private const string WorkFolder = ".preparing";
@@ -50,13 +61,27 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
 
     private string Version => profile?.Version ?? version ?? "unknown";
 
+    /// <summary>Which list the result was checked against, so a cached result needs no check and another list makes a new result.</summary>
+    private string? References => gameReferences == null ? null : Sha256File.OfText(string.Join("\n", gameReferences));
+
+    /// <summary>A line no game has, for <c>STS2_MISSING_GAME_REFERENCE=1</c>: the refusal of a build that lacks a member, on purpose.</summary>
+    public const string MissingOnPurpose = "type STS2Mobile.TestSwitch.NotInTheGame";
+
+    /// <summary>The list the app was built with, plus <paramref name="extra"/>.</summary>
+    public static IReadOnlyList<string> EmbeddedGameReferences(params string[] extra) =>
+        [.. GameReferenceList.Parse(EmbeddedData.ReadText(GameReferenceList.ResourceName)), .. extra];
+
     /// <summary>The app's preparation: the running patcher, the catalog it was built with, and the profile for the build in the folder, if any.</summary>
-    public static GameAssemblyPreparation ForApp(string gameFolder, bool includeImportedMods = true) =>
-        ForApp(gameFolder, includeImportedMods, BuiltInModInput.InOriginalFolder, BuiltInModInput.OptionalIds());
+    /// <param name="missingOnPurpose">Checks for <see cref="MissingOnPurpose"/> too, so the build is refused (a test switch).</param>
+    public static GameAssemblyPreparation ForApp(string gameFolder, bool includeImportedMods = true, bool missingOnPurpose = false) =>
+        ForApp(gameFolder, includeImportedMods, BuiltInModInput.InOriginalFolder, BuiltInModInput.OptionalIds(),
+            EmbeddedGameReferences(missingOnPurpose ? new[] { MissingOnPurpose } : []));
 
     /// <param name="builtIn">The built-in mods' inputs, from the original folder.</param>
-    /// <param name="optional">Built-in mods the game starts without when they cannot be prepared (QuickMatch).</param>
-    public static GameAssemblyPreparation ForApp(string gameFolder, bool includeImportedMods, Func<string, IReadOnlyList<BuiltInModInput>> builtIn, IReadOnlySet<string> optional)
+    /// <param name="optional">Built-in mods the game starts without when they cannot be prepared.</param>
+    /// <param name="gameReferences">What the prepared assembly must have; the embedded list when null.</param>
+    public static GameAssemblyPreparation ForApp(string gameFolder, bool includeImportedMods, Func<string, IReadOnlyList<BuiltInModInput>> builtIn, IReadOnlySet<string> optional,
+        IReadOnlyList<string>? gameReferences = null)
     {
         string patcher = typeof(GameAssemblyPreparation).Module.ModuleVersionId.ToString("N");
         var installed = InstalledBuild.Read(gameFolder);
@@ -92,11 +117,26 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
             enabled = includeImportedMods,
             mods = mods.Select(mod => new { mod.Id, mod.DllSha256, mod.ManifestSha256, mod.PckSha256 }),
         }));
-        IReadOnlyList<PatchOutcome> Build(string input, string output, IReadOnlyList<BuiltInModInput> woven)
+        return new GameAssemblyPreparation(gameFolder, profile, patcher, (input, output) =>
+        {
+            var (patches, leftOut, why) = BuildWithMods(input, output, mods, optional, tolerant: profile == null, modsOn: includeImportedMods);
+            if (leftOut.Count > 0) notice = BuiltInNotice(leftOut.Select(mod => mod.Id), why!);
+            return patches;
+        }, installed?.Version, fingerprint, refusal, () => notice, gameReferences ?? EmbeddedGameReferences());
+    }
+
+    /// <summary>
+    /// Builds the game with <paramref name="mods"/> woven in. When they do not all fit and some are optional, it builds again without the optional ones, which come back as left out with why: the game starts without them. If the
+    /// other mods are refused too, that refusal is theirs (a <see cref="WeaveException"/>). Preparation and the code check both build this way.
+    /// </summary>
+    private static (IReadOnlyList<PatchOutcome> Patches, IReadOnlyList<BuiltInModInput> LeftOut, string? Why) BuildWithMods(string input, string output,
+        IReadOnlyList<BuiltInModInput> mods, IReadOnlySet<string> optional, bool tolerant, bool modsOn)
+    {
+        IReadOnlyList<PatchOutcome> Build(IReadOnlyList<BuiltInModInput> woven)
         {
             try
             {
-                var result = GameAssemblyBuilder.Build(input, woven, output, tolerant: profile == null, modsOn: includeImportedMods);
+                var result = GameAssemblyBuilder.Build(input, woven, output, tolerant, modsOn);
                 foreach (var mod in woven) mod.VerifyUnchanged();
                 return result.Patches;
             }
@@ -106,20 +146,82 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
                 throw new WeaveException("An imported mod could not be read: " + error.Message);
             }
         }
-        return new GameAssemblyPreparation(gameFolder, profile, patcher, (input, output) =>
+        try { return (Build(mods), [], null); }
+        catch (WeaveException error) when (mods.Any(mod => optional.Contains(mod.Id)))
         {
-            try { return Build(input, output, mods); }
-            catch (WeaveException error) when (mods.Any(mod => optional.Contains(mod.Id)))
+            foreach (string file in Directory.GetFiles(output)) File.Delete(file);
+            var patches = Build(mods.Where(mod => !optional.Contains(mod.Id)).ToArray());
+            return (patches, mods.Where(mod => optional.Contains(mod.Id)).ToArray(), error.Message);
+        }
+    }
+
+    /// <summary>
+    /// Checks an untested build's code alone, before the rest of it is downloaded: the patch list in tolerant mode, the built-in mods
+    /// woven in as preparation weaves them, and the game references on the result, as <see cref="Run"/> does. Nothing is kept: the
+    /// outputs and the mods' files go to a folder beside <paramref name="originalFolder"/> that is deleted again.
+    /// </summary>
+    /// <param name="originalFolder">Holds the build's <c>sts2.dll</c> and the reporting SDK's assemblies it has, as <see cref="GameFolder.Original"/> does.</param>
+    /// <param name="gameReferences">What the prepared assembly must have; the embedded list when null.</param>
+    /// <param name="builtIn">The built-in mods' inputs, written into the folder it is given (<see cref="BuiltInModInput.InOriginalFolder(string)"/>); none when null.</param>
+    /// <param name="optional">Built-in mods the game starts without when they do not fit: those are <see cref="CodeCheck.LeftOut"/>, and any other is a refusal.</param>
+    public static CodeCheck CheckCode(string originalFolder, IReadOnlyList<string>? gameReferences = null, Func<string, IReadOnlyList<BuiltInModInput>>? builtIn = null,
+        IReadOnlySet<string>? optional = null)
+    {
+        string work = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(originalFolder))!, WorkFolder), output = Path.Combine(work, "output");
+        if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
+        Directory.CreateDirectory(output);
+        try
+        {
+            var mods = builtIn?.Invoke(Path.Combine(work, "mods-source")) ?? [];
+            IReadOnlyList<PatchOutcome> patches;
+            IReadOnlyList<BuiltInModInput> leftOut;
+            string? why;
+            try { (patches, leftOut, why) = BuildWithMods(originalFolder, output, mods, optional ?? new HashSet<string>(), tolerant: true, modsOn: false); }
+            catch (Exception error) when (error is GamePatchRefusedException or InvalidOperationException or BadImageFormatException or AssemblyResolutionException)
             {
-                // An optional mod that does not fit this game, such as QuickMatch after a game update: the game starts without it. If
-                // the other mods are refused too, that refusal is theirs, as before.
-                foreach (string file in Directory.GetFiles(output)) File.Delete(file);
-                var without = mods.Where(mod => !optional.Contains(mod.Id)).ToArray();
-                var patches = Build(input, output, without);
-                notice = BuiltInNotice(mods.Where(mod => optional.Contains(mod.Id)).Select(mod => mod.Id), error.Message);
-                return patches;
+                return new CodeCheck(RefusalReason(error), []);
             }
-        }, installed?.Version, fingerprint, refusal, () => notice);
+            catch (WeaveException error)
+            {
+                return new CodeCheck($"the built-in mods could not be prepared for it ({error.Message})", []);
+            }
+            using var module = ModuleDefinition.ReadModule(Path.Combine(output, GameProfile.GameAssembly));
+            var missing = GameReferenceList.Missing(module, gameReferences ?? EmbeddedGameReferences());
+            return new CodeCheck(missing.Count > 0 ? MissingReason(missing) : null, patches.Where(patch => !patch.Applied).Select(patch => patch.Name).ToArray(),
+                leftOut.Select(mod => new ModLeftOut(mod.Id, DisplayName(mod), Reason(mod, why!))).ToArray());
+        }
+        finally { Directory.Delete(work, recursive: true); }
+    }
+
+    /// <summary>Why a mod was left out, as the end of a sentence: the weaver's message without the mod's own id in front or its full stop.</summary>
+    private static string Reason(BuiltInModInput mod, string why) =>
+        (why.StartsWith(mod.Id + ": ", StringComparison.Ordinal) ? why[(mod.Id.Length + 2)..] : why).TrimEnd('.');
+
+    /// <summary>The name a mod's manifest gives the player, or its id.</summary>
+    private static string DisplayName(BuiltInModInput mod)
+    {
+        try
+        {
+            using var manifest = JsonDocument.Parse(File.ReadAllText(mod.ManifestPath));
+            return manifest.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String && name.GetString() is { Length: > 0 } text ? text : mod.Id;
+        }
+        catch (Exception error) when (error is JsonException or IOException) { return mod.Id; }
+    }
+
+    /// <summary>What a refused player does next: Download the game asks Steam again and offers only a version whose code passed this check.</summary>
+    public const string RefusalNext = "Press Download the game to get a version this app can run, or wait for an app update that supports this build.";
+
+    /// <summary>Why a build's code cannot be patched, as the end of a sentence.</summary>
+    public static string RefusalReason(Exception error) => error is GamePatchRefusedException refused
+        ? $"the change \"{refused.Patch}\" does not fit it ({refused.Reason}), and the game cannot run without that change"
+        : $"its code could not be patched ({error.GetType().Name}: {error.Message})";
+
+    /// <summary>Which game members the app's code uses that a build lacks, as the end of a sentence.</summary>
+    public static string MissingReason(IReadOnlyList<string> missing)
+    {
+        // "method X::Y(...) Z" names a member as "X::Y(...) Z".
+        static string Member(string line) => line[(line.IndexOf(' ') + 1)..];
+        return $"it lacks {Member(missing[0])}{(missing.Count > 1 ? $" and {missing.Count - 1} more" : "")}, which the app's code uses";
     }
 
     private static string BuiltInNotice(IEnumerable<string> ids, string why) =>
@@ -136,7 +238,9 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
 
         string input = tested ? profile!.Inputs[GameProfile.GameAssembly] : Sha256File.Of(Path.Combine(original, GameProfile.GameAssembly));
         string recordPath = Path.Combine(gameFolder, RecordName);
-        if (ReadRecord(recordPath) is { } record && record.Input == input && record.Patcher == patcherId && record.Tested == tested && record.ModInputs == modInputs
+        var record = ReadRecord(recordPath);
+        if (record != null && record.Input == input && record.Patcher == patcherId && record.Tested == tested && record.ModInputs == modInputs
+            && record.References == References
             && record.Files.All(file => File.Exists(Path.Combine(gameFolder, file.Key)) && Sha256File.Of(Path.Combine(gameFolder, file.Key)) == file.Value))
             return new PreparationResult(PreparationStatus.Cached, null, input, record.Files[GameProfile.GameAssembly], Tested: tested, Patches: record.Patches, Notice: record.Notice);
 
@@ -158,10 +262,27 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
             Directory.Delete(work, recursive: true);
             return new PreparationResult(PreparationStatus.Refused, Refusal(error), input, Tested: false);
         }
+        if (gameReferences != null && MissingReferences(Path.Combine(work, GameProfile.GameAssembly)) is { Count: > 0 } missing)
+        {
+            Directory.Delete(work, recursive: true);
+            return new PreparationResult(PreparationStatus.Refused, MissingRefusal(missing), input, Tested: tested);
+        }
         clock.Stop();
 
         var files = Directory.GetFiles(work).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal)
             .ToDictionary(name => name, name => Sha256File.Of(Path.Combine(work, name)), StringComparer.Ordinal);
+        // Mono can resolve a DLL by name even after its mod leaves the catalog.
+        if (record != null)
+        {
+            foreach (string name in record.Files.Keys.Except(files.Keys, StringComparer.OrdinalIgnoreCase))
+            {
+                string id = Path.GetFileNameWithoutExtension(name);
+                if (Path.GetFileName(name) == name && Path.GetExtension(name) is ".dll" or ".pck"
+                    && ModFiles.IsValidId(id) && !ModPackageImport.IsReservedId(id)
+                    && !GameLayout.UnchangedAssemblies.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    File.Delete(Path.Combine(gameFolder, name));
+            }
+        }
         // No record while the files change, so a crash here is seen as no result.
         File.Delete(recordPath);
         foreach (string name in files.Keys) File.Move(Path.Combine(work, name), Path.Combine(gameFolder, name), overwrite: true);
@@ -170,6 +291,16 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
         Directory.Delete(work, recursive: true);
         return new PreparationResult(PreparationStatus.Prepared, null, input, files[GameProfile.GameAssembly], clock.Elapsed, tested, patches, Notice: builtInNotice);
     }
+
+    private IReadOnlyList<string> MissingReferences(string assembly)
+    {
+        // Names only: nothing here is resolved, so the game's other assemblies are not read.
+        using var module = ModuleDefinition.ReadModule(assembly);
+        return GameReferenceList.Missing(module, gameReferences!);
+    }
+
+    private string MissingRefusal(IReadOnlyList<string> missing) =>
+        $"Game version {Version} cannot run with this app: {MissingReason(missing)}. Nothing was changed.\n{RefusalNext}";
 
     private string? Verify(string original, GameProfile tested)
     {
@@ -189,16 +320,11 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
             ? $"The game files are incomplete: {missing} is missing."
             : null;
 
-    private string Refusal(Exception error)
-    {
-        string why = error is GamePatchRefusedException refused
-            ? $"the change \"{refused.Patch}\" does not fit it ({refused.Reason})"
-            : $"its code could not be patched ({error.GetType().Name}: {error.Message})";
-        return $"Game version {Version} has not been tested with this app, and it cannot be prepared for this iPhone: {why}. The game cannot run without that change, "
-            + "so nothing was changed.\nChoose the other version under Game version, or wait for an app update that supports this build.";
-    }
+    private string Refusal(Exception error) =>
+        $"Game version {Version} has not been tested with this app, and it cannot be prepared for this iPhone: {RefusalReason(error)}. Nothing was changed.\n{RefusalNext}";
 
-    private sealed record Record(string? Input, string? Patcher, bool Tested, IReadOnlyList<PatchOutcome>? Patches, Dictionary<string, string> Files, string? ModInputs, string? Notice);
+    private sealed record Record(string? Input, string? Patcher, bool Tested, IReadOnlyList<PatchOutcome>? Patches, Dictionary<string, string> Files, string? ModInputs, string? Notice,
+        string? References);
 
     private void WriteRecord(string path, string input, bool tested, IReadOnlyList<PatchOutcome> patches, Dictionary<string, string> files, TimeSpan elapsed, string? builtInNotice)
     {
@@ -211,6 +337,7 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
             ["patcher"] = patcherId,
             ["tested"] = tested,
             ["modInputs"] = modInputs,
+            ["gameReferences"] = References,
             ["files"] = outputs,
             ["milliseconds"] = (long)elapsed.TotalMilliseconds,
         };
@@ -243,7 +370,7 @@ public sealed class GameAssemblyPreparation(string gameFolder, GameProfile? prof
                     patch.GetProperty("applied").GetBoolean(), Sha256File.ReadString(patch, "note"))).ToList()
                 : null;
             return files.ContainsKey(GameProfile.GameAssembly) ? new Record(Sha256File.ReadString(root, "input"), Sha256File.ReadString(root, "patcher"), tested, patches, files,
-                Sha256File.ReadString(root, "modInputs"), Sha256File.ReadString(root, "notice")) : null;
+                Sha256File.ReadString(root, "modInputs"), Sha256File.ReadString(root, "notice"), Sha256File.ReadString(root, "gameReferences")) : null;
         }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException)
         {

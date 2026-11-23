@@ -1,9 +1,17 @@
 {
   "version": 1,
   "dependencies": {
-    "net10.0": {},
+    "net10.0": {
+      "sts2mobile.modapi": {
+        "type": "Project"
+      }
+    },
     "net10.0/ios-arm64": {},
-    "net9.0": {},
+    "net9.0": {
+      "sts2mobile.modapi": {
+        "type": "Project"
+      }
+    },
     "net9.0/ios-arm64": {}
   }
 }

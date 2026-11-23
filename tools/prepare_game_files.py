@@ -79,7 +79,7 @@ def built_in_mods(catalog: Path = BUILT_IN_MODS) -> list[tuple[Path, str]]:
     """Each code mod's files and where they go in the original folder, each checked against the catalog's hash."""
     files = []
     for entry in json.loads(catalog.read_text())["mods"]:
-        # An optional mod (QuickMatch) that ./setup.sh did not fetch: the app is built without it.
+        # An optional mod that ./setup.sh did not fetch: the app is built without it.
         if entry.get("optional") and not Path(entry["dll"]).expanduser().is_file():
             continue
         fields = [("dll", "dll"), ("manifest", "json")]
