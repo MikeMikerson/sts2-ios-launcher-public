@@ -41,7 +41,7 @@ internal static class GameAssemblies
     private static string? RepositoryRoot()
     {
         for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder != null; folder = folder.Parent)
-            if (File.Exists(Path.Combine(folder.FullName, "AGENTS.md"))) return folder.FullName;
+            if (File.Exists(Path.Combine(folder.FullName, "STS2Mobile.slnx"))) return folder.FullName;
         return null;
     }
 }
