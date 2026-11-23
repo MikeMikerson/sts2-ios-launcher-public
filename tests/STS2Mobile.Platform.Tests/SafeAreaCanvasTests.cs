@@ -70,6 +70,28 @@ public class SafeAreaCanvasTests
     }
 
     [Fact]
+    public void FillScreenKeepsPortraitLayoutAndSurvivesSwitchingBack()
+    {
+        try
+        {
+            SafeAreaCanvas.FillScreen = true;
+            SafeAreaCanvas.SetPortrait(true);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(1179, 2556, out int pw, out int ph));
+            Assert.Equal((1080, 2341), (pw, ph));
+
+            SafeAreaCanvas.SetPortrait(false);
+            Assert.True(SafeAreaCanvas.FillScreen);
+            Assert.Equal(SafeAreaCanvas.Expand, SafeAreaCanvas.Layout(2556, 1179, out int lw, out int lh));
+            Assert.Equal((1680, 1080), (lw, lh));
+        }
+        finally
+        {
+            SafeAreaCanvas.FillScreen = false;
+            SafeAreaCanvas.SetPortrait(false);
+        }
+    }
+
+    [Fact]
     public void SwitchingPortraitModeUpdatesAndRestoresLayout()
     {
         try

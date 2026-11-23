@@ -18,6 +18,8 @@ public sealed record PhoneGraphicsSettings(
     bool PortraitMode = false,
     bool PortraitDefault = false)
 {
+    public bool FillScreen { get; init; }
+
     public const string FileName = "phone-graphics.json";
     private const int Format = 1;
 
@@ -83,7 +85,10 @@ public sealed record PhoneGraphicsSettings(
                 Flag(root, "coolDownWhenHot"),
                 Flag(root, "msaaCleared"),
                 portraitMode,
-                portraitMode && Flag(root, "portraitDefault"));
+                portraitMode && Flag(root, "portraitDefault"))
+            {
+                FillScreen = Flag(root, "fillScreen"),
+            };
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException)
         {
@@ -106,6 +111,7 @@ public sealed record PhoneGraphicsSettings(
             writer.WriteBoolean("lowerIdleFrameRate", LowerIdleFrameRate);
             writer.WriteBoolean("coolDownWhenHot", CoolDownWhenHot);
             writer.WriteBoolean("msaaCleared", MsaaCleared);
+            writer.WriteBoolean("fillScreen", FillScreen);
             writer.WriteBoolean("portraitMode", PortraitMode);
             writer.WriteBoolean("portraitDefault", PortraitMode && PortraitDefault);
             writer.WriteEndObject();

@@ -140,6 +140,10 @@ In portrait every screen is laid out for the narrow screen, with buttons and tex
 
 Portrait Mode changes nothing in landscape.
 
+In landscape the game stays inside the screen's safe area by default. **Settings > Graphics > Fill Screen**
+uses the full screen after restarting the app; the notch or rounded corners may cover edge controls.
+This choice is saved independently of Portrait Mode and Battery Saver and does not change the portrait layout.
+
 ## Every 7 days, with a free Apple ID
 
 A free Apple ID's apps stop opening after 7 days. Connect the iPhone and run `./setup.sh --install` again. It

@@ -1,7 +1,10 @@
+import plistlib
 import struct
 import unittest
 import zlib
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from prepare_full_game_xcode import (
     MICROPHONE_PURPOSE,
@@ -12,6 +15,7 @@ from prepare_full_game_xcode import (
     fill_purpose_strings,
     keep_exported_symbols,
     opaque_png,
+    prepare,
     startup_arguments,
     use_app_store_launch_packaging,
 )
@@ -172,6 +176,28 @@ class AppIconTests(unittest.TestCase):
 
 
 class InfoPropertyTests(unittest.TestCase):
+    def test_generated_plist_enables_game_mode_as_a_boolean(self):
+        with TemporaryDirectory() as directory:
+            export = Path(directory)
+            project = export / "FullGame.xcodeproj/project.pbxproj"
+            info = export / "FullGame/FullGame-Info.plist"
+            project.parent.mkdir()
+            info.parent.mkdir()
+            project.write_text(PROJECT, encoding="utf-8")
+            info.write_bytes(plistlib.dumps({"CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)"}))
+
+            with (
+                patch("prepare_full_game_xcode.EXPORT", export),
+                patch("prepare_full_game_xcode.use_app_store_launch_packaging", return_value=PROJECT),
+                patch("prepare_full_game_xcode.keep_exported_symbols", return_value=PROJECT),
+                patch("prepare_full_game_xcode.add_host_files", return_value=PROJECT),
+                patch("prepare_full_game_xcode.local_settings", return_value={"bundle": "io.example.game"}),
+                patch("prepare_full_game_xcode.configure_project", return_value=PROJECT),
+            ):
+                prepare()
+
+            self.assertIs(plistlib.loads(info.read_bytes())["LSSupportsGameMode"], True)
+
     def test_unused_permissions_are_removed(self):
         properties = {
             "NSCameraUsageDescription": "",
